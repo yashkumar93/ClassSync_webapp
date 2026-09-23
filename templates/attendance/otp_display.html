@@ -85,7 +85,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="cs-otp-display">
+<div class="cs-otp-display" id="otpDisplay" data-validity="{{ validity_seconds|default:60 }}" data-remaining="{{ remaining_seconds|default:60 }}">
   <div class="cs-otp-label" style="font-size:1.8rem; font-weight:600;">
     <span class="badge bg-light text-primary me-2" style="font-size:1.2rem; vertical-align:middle;">{{ slot.section.course.code }}</span>
     {{ slot.section.course.name }} &mdash; Section {{ slot.section.name }}
@@ -149,45 +149,57 @@
 {% block extra_js %}
 <script>
   (function() {
-    const totalSeconds = {{ validity_seconds }};
-    let remaining = {{ remaining_seconds }};
+    const displayEl = document.getElementById('otpDisplay');
+    const totalSeconds = displayEl ? parseInt(displayEl.getAttribute('data-validity') || '60', 10) : 60;
+    let remaining = displayEl ? parseInt(displayEl.getAttribute('data-remaining') || '60', 10) : 60;
     const circumference = 2 * Math.PI * 60; // r=60
 
     const ringFg    = document.getElementById('ringFg');
     const textEl    = document.getElementById('countdownText');
     const codeEl    = document.getElementById('otpCode');
     const overlay   = document.getElementById('expiredOverlay');
+    let timer       = null;
 
     function update() {
       // Update text
-      textEl.textContent = remaining > 0 ? remaining + 's' : '0s';
+      if (textEl) {
+        textEl.textContent = remaining > 0 ? remaining + 's' : '0s';
+      }
 
       // Update ring
-      const progress = remaining / totalSeconds;
-      ringFg.style.strokeDashoffset = circumference * (1 - progress);
+      if (ringFg && totalSeconds > 0) {
+        const progress = remaining / totalSeconds;
+        ringFg.style.strokeDashoffset = (circumference * (1 - progress)).toString();
 
-      // Colour transitions
-      ringFg.classList.remove('warning', 'danger');
-      if (remaining <= 10) {
-        ringFg.classList.add('danger');
-      } else if (remaining <= 30) {
-        ringFg.classList.add('warning');
+        // Colour transitions
+        ringFg.classList.remove('warning', 'danger');
+        if (remaining <= 10) {
+          ringFg.classList.add('danger');
+        } else if (remaining <= 30) {
+          ringFg.classList.add('warning');
+        }
       }
 
       if (remaining <= 0) {
-        clearInterval(timer);
-        codeEl.style.opacity = '0.2';
-        codeEl.classList.remove('active');
-        overlay.classList.add('show');
+        if (timer) clearInterval(timer);
+        if (codeEl) {
+          codeEl.style.opacity = '0.2';
+          codeEl.classList.remove('active');
+        }
+        if (overlay) {
+          overlay.classList.add('show');
+        }
       }
 
       remaining--;
     }
 
     // Initial render
-    ringFg.style.strokeDasharray = circumference;
+    if (ringFg) {
+      ringFg.style.strokeDasharray = circumference.toString();
+    }
     update();
-    const timer = setInterval(update, 1000);
+    timer = setInterval(update, 1000);
   })();
 </script>
 {% endblock %}
