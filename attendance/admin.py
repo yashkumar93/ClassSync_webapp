@@ -7,9 +7,9 @@ from .models import AttendanceSession, AttendanceRecord, ThresholdAlert
 class AttendanceSessionAdmin(django_admin.ModelAdmin):
     list_display = [
         "timetable_slot", "date", "otp_code", "generated_by",
-        "expires_at", "is_active", "created_at",
+        "expires_at", "absences_processed", "is_active", "created_at",
     ]
-    list_filter = ["date", "timetable_slot__section__course"]
+    list_filter = ["date", "absences_processed", "timetable_slot__section__course"]
     search_fields = [
         "otp_code",
         "generated_by__first_name", "generated_by__last_name",
@@ -25,12 +25,12 @@ class AttendanceSessionAdmin(django_admin.ModelAdmin):
 
 @django_admin.register(AttendanceRecord)
 class AttendanceRecordAdmin(django_admin.ModelAdmin):
-    list_display = ["student", "session", "marked_at"]
-    list_filter = ["session__date", "session__timetable_slot__section__course"]
+    list_display = ["student", "session", "status", "marked_at", "updated_at"]
+    list_filter = ["status", "session__date", "session__timetable_slot__section__course"]
     search_fields = [
         "student__first_name", "student__last_name", "student__roll_number",
     ]
-    readonly_fields = ["marked_at"]
+    readonly_fields = ["marked_at", "updated_at"]
 
 
 @django_admin.register(ThresholdAlert)

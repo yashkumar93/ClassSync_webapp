@@ -7,7 +7,13 @@ from django.views.decorators.http import require_POST
 from core.decorators import role_required
 from core.models import TimetableSlot, SystemConfig
 from .models import AbsenceReport, FacultyAvailability
-from .engine import propose_next_substitute, confirm_substitution, decline_or_timeout
+from .engine import (
+    broadcast_substitution_request,
+    propose_next_substitute,
+    confirm_substitution,
+    decline_or_timeout,
+    mark_self_study,
+)
 from .forms import AbsenceReportForm
 
 
@@ -25,17 +31,15 @@ def report_absence(request):
             report.status = AbsenceReport.STATUS_PENDING
             report.save()
 
-            # Immediately kick off the reassignment engine
-            proposed = propose_next_substitute(report)
-            if proposed:
+            # Broadcast substitution request to all other eligible faculty members
+            candidates = broadcast_substitution_request(report)
+            if candidates and candidates.exists():
                 messages.success(
                     request,
-                    f"Absence reported. {proposed.get_full_name()} has been proposed as substitute "
-                    f"and has {SystemConfig.get().confirmation_window_minutes} minutes to confirm."
+                    f"Absence reported. Substitution request has been sent to all {candidates.count()} eligible faculty members "
+                    f"who can now accept or decline."
                 )
             else:
-                # No eligible faculty → self-study
-                from .engine import mark_self_study
                 mark_self_study(report)
                 messages.warning(
                     request,
@@ -52,7 +56,7 @@ def report_absence(request):
 def my_absences(request):
     absences = AbsenceReport.objects.filter(faculty=request.user).select_related(
         "timetable_slot__section__course", "proposed_substitute"
-    ).order_by("-date")
+    ).prefetch_related("notified_substitutes", "declined_substitutes").order_by("-date")
     return render(request, "absence/my_absences.html", {"absences": absences})
 
 
@@ -80,32 +84,35 @@ def opt_in_status(request):
 @role_required("faculty")
 @require_POST
 def confirm_substitute(request, pk):
-    report = get_object_or_404(
-        AbsenceReport,
-        pk=pk,
-        proposed_substitute=request.user,
-        status=AbsenceReport.STATUS_PENDING_CONFIRMATION,
-    )
+    report = get_object_or_404(AbsenceReport, pk=pk)
+
+    if report.status != AbsenceReport.STATUS_PENDING_CONFIRMATION:
+        if report.status == AbsenceReport.STATUS_REASSIGNED:
+            sub_name = report.proposed_substitute.get_full_name() if report.proposed_substitute else "another faculty member"
+            messages.warning(request, f"This substitution request has already been accepted by {sub_name}.")
+        else:
+            messages.warning(request, "This substitution request is no longer available.")
+        return redirect("core:faculty_dashboard")
+
     if report.is_confirmation_expired:
         messages.error(request, "Confirmation window has expired.")
         return redirect("core:faculty_dashboard")
 
-    confirm_substitution(report)
-    messages.success(request, f"You have confirmed substitution for {report.timetable_slot.section.course.name} on {report.date}.")
+    confirm_substitution(report, substitute_faculty=request.user)
+    messages.success(
+        request,
+        f"You have confirmed substitution for {report.timetable_slot.section.course.name} on {report.date}."
+    )
     return redirect("core:faculty_dashboard")
 
 
 @role_required("faculty")
 @require_POST
 def decline_substitute(request, pk):
-    report = get_object_or_404(
-        AbsenceReport,
-        pk=pk,
-        proposed_substitute=request.user,
-        status=AbsenceReport.STATUS_PENDING_CONFIRMATION,
-    )
-    decline_or_timeout(report)
-    messages.info(request, "You have declined the substitution request.")
+    report = get_object_or_404(AbsenceReport, pk=pk)
+    if report.status == AbsenceReport.STATUS_PENDING_CONFIRMATION:
+        decline_or_timeout(report, declining_faculty=request.user)
+        messages.info(request, "You have declined this substitution request.")
     return redirect("core:faculty_dashboard")
 
 

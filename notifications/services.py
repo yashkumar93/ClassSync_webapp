@@ -248,7 +248,7 @@ def _notify_risk_flag(flag):
                 notif_type=Notification.TYPE_RISK_FLAG,
                 message=(
                     f"Early-warning flag raised for {flag.student.get_full_name()} "
-                    f"in {flag.course.name}. {flag.reason}"
+                    f"in {flag.course.code}: {flag.course.name}. {flag.reason}"
                 ),
                 related_object_id=flag.pk,
             )
@@ -263,7 +263,7 @@ def _notify_risk_flag(flag):
                 notif_type=Notification.TYPE_RISK_FLAG,
                 message=(
                     f"Early-warning flag raised for {flag.student.get_full_name()} "
-                    f"in {flag.course.name}. {flag.reason}"
+                    f"in {flag.course.code}: {flag.course.name}. {flag.reason}"
                 ),
                 related_object_id=flag.pk,
             )

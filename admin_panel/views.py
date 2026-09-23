@@ -260,16 +260,33 @@ def section_edit(request, pk):
 
 @role_required("admin")
 def timetable_list(request):
+    from core.timetable_helper import build_timetable_grid
+
     section_id = request.GET.get("section", "")
+    faculty_id = request.GET.get("faculty", "")
+    view_mode = request.GET.get("view", "grid")
+
     slots = TimetableSlot.objects.select_related(
         "section__course", "section__faculty"
     ).order_by("day", "period_number")
+
     if section_id:
         slots = slots.filter(section_id=section_id)
+    if faculty_id:
+        slots = slots.filter(section__faculty_id=faculty_id)
+
+    grid_data = build_timetable_grid(slots)
+    faculties = User.objects.filter(role="faculty", is_active=True).order_by("first_name", "last_name")
+
     return render(request, "admin_panel/timetable_list.html", {
         "slots": slots,
         "sections": Section.objects.select_related("course").all(),
+        "faculties": faculties,
         "section_id": section_id,
+        "faculty_id": faculty_id,
+        "view_mode": view_mode,
+        "grid": grid_data,
+        "total_slots": slots.count(),
     })
 
 

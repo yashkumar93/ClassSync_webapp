@@ -161,7 +161,7 @@ class SystemConfig(models.Model):
     There should only ever be one row (pk=1).
     """
     otp_validity_seconds = models.PositiveIntegerField(
-        default=90,
+        default=60,
         help_text="How long (seconds) an OTP is valid for attendance marking.",
     )
     attendance_threshold = models.PositiveSmallIntegerField(

@@ -11,8 +11,7 @@ environ.Env.read_env(BASE_DIR / ".env")
 
 SECRET_KEY = env("SECRET_KEY", default="django-insecure-dev-key-change-in-prod")
 DEBUG = env("DEBUG")
-ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["127.0.0.1", "localhost"])
-
+ALLOWED_HOSTS = ["127.0.0.1", "localhost", "10.0.2.2"]
 INSTALLED_APPS = [
     # Django built-ins
     "django.contrib.admin",
@@ -82,6 +81,11 @@ LOGIN_URL = "/login/"
 LOGIN_REDIRECT_URL = "/dashboard/"
 LOGOUT_REDIRECT_URL = "/login/"
 
+AUTHENTICATION_BACKENDS = [
+    "core.auth_backends.CaseInsensitiveModelBackend",
+    "django.contrib.auth.backends.ModelBackend",
+]
+
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
@@ -107,7 +111,7 @@ CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
 
 # Class Sync system defaults (overridden per-institution via SystemConfig model)
-CLASSSYNC_OTP_VALIDITY_SECONDS = 90
+CLASSSYNC_OTP_VALIDITY_SECONDS = 60
 CLASSSYNC_ATTENDANCE_THRESHOLD = 75
 CLASSSYNC_RISK_MISSED_SUBMISSIONS = 2
 CLASSSYNC_RISK_WINDOW_DAYS = 30

@@ -12,7 +12,7 @@
   <div class="col-md-6 col-xl-4">
     <div class="cs-card" style="{% if item.already_marked %}opacity:0.6;{% endif %}">
       <div class="cs-card-header">
-        <h6>{{ item.section.course.name }}</h6>
+        <h6><span class="cs-badge primary me-1" style="font-size:0.75rem; padding:0.15rem 0.4rem;">{{ item.section.course.code }}</span>{{ item.section.course.name }}</h6>
         <span class="cs-badge neutral fs-sm">Sec {{ item.section.name }}</span>
       </div>
       <div class="cs-card-body">
@@ -25,8 +25,27 @@
           {% endif %}
         </div>
 
-        {% if item.already_marked %}
-          <!-- Already marked -->
+        {% if now_time < item.slot.start_time %}
+          <!-- Class hasn't started yet -->
+          <div class="cs-alert info" style="margin-bottom:0; font-size:0.85rem;">
+            <i class="bi bi-clock"></i>
+            Class starts at {{ item.slot.start_time|time:"H:i" }}. OTP entry will be available then.
+          </div>
+
+        {% elif now_time > item.slot.end_time %}
+          <!-- Class time has passed -->
+          <div class="cs-alert warning" style="margin-bottom:0; font-size:0.85rem;">
+            <i class="bi bi-clock-history"></i>
+            Class time has ended ({{ item.slot.end_time|time:"H:i" }}).
+            {% if item.already_marked %}
+              You were marked present.
+            {% else %}
+              Contact your lecturer if you missed attendance.
+            {% endif %}
+          </div>
+
+        {% elif item.already_marked %}
+          <!-- Already marked during active window -->
           <div class="cs-alert success" style="margin-bottom:0; font-size:0.85rem;">
             <i class="bi bi-check-circle"></i>
             Attendance already recorded
@@ -64,7 +83,7 @@
           </div>
 
         {% else %}
-          <!-- No session generated yet -->
+          <!-- No session generated yet but class is active -->
           <div class="text-muted fs-sm" style="padding:0.5rem 0;">
             <i class="bi bi-hourglass-split me-1"></i>
             No OTP session yet — waiting for lecturer to generate.

@@ -7,7 +7,7 @@
     <i class="bi bi-upload me-2" style="color:var(--cs-primary);"></i>
     {% if existing %}Resubmit Assignment{% else %}Submit Assignment{% endif %}
   </h1>
-  <div class="subtitle">{{ assignment.section.course.name }} — {{ assignment.title }}</div>
+  <div class="subtitle">{{ assignment.section.course.code }}: {{ assignment.section.course.name }} — {{ assignment.title }}</div>
 </div>
 
 {% if assignment.is_past_due and not existing %}

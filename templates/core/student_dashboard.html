@@ -15,10 +15,73 @@
           <div style="font-size:1.1rem; font-weight:700;">Mark Your Attendance</div>
           <div style="opacity:0.85; font-size:0.875rem;">Enter the OTP displayed by your lecturer to mark yourself present.</div>
         </div>
-        <a href="{% url 'attendance:submit_otp' %}" class="btn-cs-primary"
-           style="background:white; color:var(--cs-primary); font-weight:600; padding:0.6rem 1.4rem;">
-          <i class="bi bi-check2-circle"></i> Enter OTP
+        <div class="d-flex gap-2">
+          <a href="{% url 'attendance:submit_otp' %}" class="btn-cs-primary"
+             style="background:white; color:var(--cs-primary); font-weight:600; padding:0.6rem 1.4rem;">
+            <i class="bi bi-check2-circle"></i> Enter OTP
+          </a>
+          <a href="{% url 'core:student_timetable' %}" class="btn btn-outline-light"
+             style="font-weight:500; padding:0.6rem 1.2rem;">
+            <i class="bi bi-calendar3"></i> View Timetable
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Today's Class Schedule -->
+  <div class="col-12">
+    <div class="cs-card">
+      <div class="cs-card-header d-flex justify-content-between align-items-center">
+        <h5><i class="bi bi-calendar-day me-2"></i>Today's Classes ({{ today|date:"l, F j" }})</h5>
+        <a href="{% url 'core:student_timetable' %}" class="btn-cs-secondary" style="font-size:0.8rem;">
+          <i class="bi bi-calendar3"></i> Full Weekly Timetable
         </a>
+      </div>
+      <div class="cs-card-body" style="padding:0;">
+        {% if today_classes %}
+          <div class="cs-table-wrapper" style="border:none;box-shadow:none;border-radius:0;">
+            <table class="cs-table">
+              <thead>
+                <tr>
+                  <th>Period</th>
+                  <th>Course</th>
+                  <th>Faculty</th>
+                  <th>Room</th>
+                  <th>Time</th>
+                  <th style="text-align:right;">Attendance</th>
+                </tr>
+              </thead>
+              <tbody>
+              {% for slot in today_classes %}
+              <tr>
+                <td><span class="cs-badge info fw-bold">P{{ slot.period_number }}</span></td>
+                <td>
+                  <span class="fw-600">{{ slot.section.course.code }}: {{ slot.section.course.name }}</span>
+                  <span class="text-muted small ms-1">(Sec {{ slot.section.name }})</span>
+                </td>
+                <td>{{ slot.section.faculty.get_full_name|default:"—" }}</td>
+                <td><span class="text-muted small"><i class="bi bi-geo-alt"></i> {{ slot.section.room|default:"—" }}</span></td>
+                <td><span class="small fw-600">{{ slot.start_time|time:"H:i" }} &ndash; {{ slot.end_time|time:"H:i" }}</span></td>
+                <td style="text-align:right;">
+                  {% if now_time >= slot.start_time and now_time <= slot.end_time %}
+                    <a href="{% url 'attendance:submit_otp' %}" class="btn-cs-primary" style="font-size:0.75rem; padding:0.25rem 0.65rem;">
+                      <i class="bi bi-shield-check"></i> Enter OTP
+                    </a>
+                  {% elif now_time < slot.start_time %}
+                    <span class="cs-badge neutral" style="font-size:0.72rem;"><i class="bi bi-clock"></i> Not started</span>
+                  {% else %}
+                    <span class="cs-badge neutral" style="font-size:0.72rem;"><i class="bi bi-check2"></i> Class ended</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="text-center text-muted py-4"><i class="bi bi-cup-hot" style="font-size:2rem;"></i><br>No classes scheduled for today. Enjoy your day!</div>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -34,7 +97,7 @@
         {% for row in attendance_summary %}
         <div style="margin-bottom:1rem;">
           <div class="d-flex justify-content-between align-items-center mb-1">
-            <span class="fw-600 fs-sm">{{ row.section.course.name }} &mdash; Sec {{ row.section.name }}</span>
+            <span class="fw-600 fs-sm"><span class="cs-badge primary me-1" style="font-size:0.7rem; padding:0.1rem 0.35rem;">{{ row.section.course.code }}</span>{{ row.section.course.name }} &mdash; Sec {{ row.section.name }}</span>
             <span class="fw-700 {% if row.below_threshold %}text-danger{% else %}text-success{% endif %}">
               {{ row.percentage }}%
             </span>
@@ -66,7 +129,7 @@
         {% for a in upcoming_assignments %}
         <div style="padding:0.75rem; border-bottom:1px solid var(--cs-gray-100);">
           <div class="fw-600 fs-sm">{{ a.title }}</div>
-          <div class="fs-sm text-muted">{{ a.section.course.name }}</div>
+          <div class="fs-sm text-muted"><span class="cs-badge neutral me-1" style="font-size:0.7rem;">{{ a.section.course.code }}</span>{{ a.section.course.name }}</div>
           <div style="font-size:0.75rem; margin-top:0.3rem;">
             <i class="bi bi-calendar-event text-warning"></i>
             Due: <strong>{{ a.due_date|date:"d M, H:i" }}</strong>

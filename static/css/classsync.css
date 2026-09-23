@@ -643,6 +643,164 @@ label { font-weight: 500; font-size: 0.875rem; color: var(--cs-gray-800); }
 .fs-sm { font-size: 0.8125rem; }
 .mt-auto { margin-top: auto; }
 
+/* ---------- Timetable Matrix & Cards ---------- */
+.cs-timetable-wrapper {
+  background: var(--cs-white);
+  border: 1px solid var(--cs-border);
+  border-radius: var(--cs-radius);
+  box-shadow: var(--cs-shadow-sm);
+  overflow-x: auto;
+}
+
+.cs-timetable-grid {
+  width: 100%;
+  min-width: 820px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.cs-timetable-grid th,
+.cs-timetable-grid td {
+  border: 1px solid var(--cs-border);
+  vertical-align: top;
+}
+
+.cs-timetable-grid th {
+  background: var(--cs-gray-50);
+  padding: 0.75rem 0.6rem;
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.cs-timetable-grid th.day-header.is-today {
+  background: var(--cs-primary-light);
+  color: var(--cs-primary-dark);
+  border-top: 3px solid var(--cs-primary);
+}
+
+.cs-timetable-grid th.period-col-header {
+  width: 120px;
+  min-width: 120px;
+  max-width: 120px;
+}
+
+.cs-timetable-grid td.period-cell {
+  background: var(--cs-gray-50);
+  padding: 0.6rem 0.5rem;
+  text-align: center;
+  font-size: 0.78rem;
+}
+
+.cs-timetable-grid td.period-cell .period-badge {
+  display: inline-block;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--cs-primary);
+}
+
+.cs-timetable-grid td.period-cell .period-time {
+  color: var(--cs-gray-600);
+  font-size: 0.72rem;
+  margin-top: 0.15rem;
+}
+
+.cs-timetable-grid td.break-row-cell {
+  background: var(--cs-gray-100);
+  color: var(--cs-gray-600);
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  padding: 0.4rem;
+}
+
+.cs-timetable-grid td.slot-cell {
+  padding: 0.4rem;
+  height: 95px;
+  background: var(--cs-white);
+  position: relative;
+}
+
+.cs-timetable-grid td.slot-cell.is-today-col {
+  background: rgba(232, 240, 251, 0.25);
+}
+
+.cs-timetable-card {
+  background: var(--cs-white);
+  border: 1px solid var(--cs-border);
+  border-left: 4px solid var(--cs-primary);
+  border-radius: var(--cs-radius-sm);
+  padding: 0.5rem 0.55rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  height: 100%;
+  transition: all 0.15s ease-in-out;
+}
+
+.cs-timetable-card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--cs-shadow);
+}
+
+.cs-timetable-card.theme-blue   { border-left-color: #1a56a0; background: #f8fbff; }
+.cs-timetable-card.theme-green  { border-left-color: #1c8a4e; background: #f4fbf7; }
+.cs-timetable-card.theme-purple { border-left-color: #7c3aed; background: #faf5ff; }
+.cs-timetable-card.theme-amber  { border-left-color: #d97706; background: #fffbeb; }
+.cs-timetable-card.theme-teal   { border-left-color: #0d9488; background: #f0fdfa; }
+
+.cs-timetable-card .card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem;
+}
+
+.cs-timetable-card .course-code {
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: var(--cs-gray-900);
+}
+
+.cs-timetable-card .course-name {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--cs-gray-700);
+  line-height: 1.25;
+  margin-top: 0.05rem;
+}
+
+.cs-timetable-card .card-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  font-size: 0.7rem;
+  color: var(--cs-gray-600);
+  margin-top: auto;
+  padding-top: 0.25rem;
+}
+
+.cs-timetable-card .card-meta i {
+  margin-right: 0.15rem;
+}
+
+.cs-timetable-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 70px;
+  color: var(--cs-gray-400);
+  font-size: 0.72rem;
+  font-style: italic;
+  border-radius: var(--cs-radius-sm);
+  border: 1px dashed var(--cs-gray-200);
+  background: rgba(248, 249, 250, 0.6);
+}
+
 /* ---------- Responsive ---------- */
 @media (max-width: 768px) {
   .cs-sidebar { transform: translateX(-100%); transition: transform 0.25s ease; }

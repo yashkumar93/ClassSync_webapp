@@ -1,46 +1,203 @@
 {% extends "base.html" %}
 {% block title %}Timetable{% endblock %}
+
 {% block content %}
-<div class="cs-page-header d-flex align-items-center justify-content-between">
+<div class="cs-page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
   <div>
-    <h1><i class="bi bi-calendar3 me-2" style="color:var(--cs-primary);"></i>Timetable</h1>
+    <h1><i class="bi bi-calendar3 me-2" style="color:var(--cs-primary);"></i>Timetable Schedule</h1>
+    <div class="subtitle">{{ total_slots }} total weekly slots across {{ sections|length }} sections</div>
   </div>
-  <a href="{% url 'admin_panel:timetable_create' %}" class="btn-cs-primary"><i class="bi bi-plus"></i> Add Slot</a>
+  <div class="d-flex gap-2 align-items-center">
+    <!-- View Switcher -->
+    <div class="btn-group" role="group">
+      <a href="?view=grid{% if section_id %}&section={{ section_id }}{% endif %}{% if faculty_id %}&faculty={{ faculty_id }}{% endif %}"
+         class="btn btn-sm {% if view_mode == 'grid' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+         style="font-size:0.85rem; padding:0.35rem 0.8rem;">
+        <i class="bi bi-grid-3x3"></i> Weekly Grid
+      </a>
+      <a href="?view=list{% if section_id %}&section={{ section_id }}{% endif %}{% if faculty_id %}&faculty={{ faculty_id }}{% endif %}"
+         class="btn btn-sm {% if view_mode == 'list' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+         style="font-size:0.85rem; padding:0.35rem 0.8rem;">
+        <i class="bi bi-list-ul"></i> List View
+      </a>
+    </div>
+
+    <a href="{% url 'admin_panel:timetable_create' %}" class="btn-cs-primary" style="font-size:0.85rem;">
+      <i class="bi bi-plus-lg"></i> Add Slot
+    </a>
+  </div>
 </div>
 
-<!-- Filter -->
-<form method="get" class="d-flex gap-2 mb-3">
-  <select name="section" class="form-select" style="max-width:320px;">
-    <option value="">All sections</option>
-    {% for s in sections %}<option value="{{ s.pk }}" {% if section_id == s.pk|stringformat:'s' %}selected{% endif %}>{{ s }}</option>{% endfor %}
-  </select>
-  <button type="submit" class="btn-cs-primary">Filter</button>
-</form>
+<!-- Filters Bar -->
+<div class="cs-card mb-4" style="padding:0.75rem 1rem;">
+  <form method="get" class="d-flex gap-3 align-items-center flex-wrap">
+    <input type="hidden" name="view" value="{{ view_mode }}">
 
+    <div class="d-flex align-items-center gap-2">
+      <label class="small fw-600 text-muted text-nowrap"><i class="bi bi-diagram-3"></i> Section:</label>
+      <select name="section" class="form-select form-select-sm" style="min-width:200px;">
+        <option value="">All Sections</option>
+        {% for s in sections %}
+          <option value="{{ s.pk }}" {% if section_id == s.pk|stringformat:'s' %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="d-flex align-items-center gap-2">
+      <label class="small fw-600 text-muted text-nowrap"><i class="bi bi-person-badge"></i> Faculty:</label>
+      <select name="faculty" class="form-select form-select-sm" style="min-width:200px;">
+        <option value="">All Faculty</option>
+        {% for f in faculties %}
+          <option value="{{ f.pk }}" {% if faculty_id == f.pk|stringformat:'s' %}selected{% endif %}>{{ f.get_full_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn-cs-primary" style="font-size:0.8rem; padding:0.35rem 0.85rem;">
+        <i class="bi bi-funnel"></i> Apply Filter
+      </button>
+      {% if section_id or faculty_id %}
+        <a href="?view={{ view_mode }}" class="btn-cs-secondary" style="font-size:0.8rem; padding:0.35rem 0.85rem;">
+          <i class="bi bi-x-circle"></i> Reset
+        </a>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+{% if view_mode == 'grid' %}
+<!-- ===== WEEKLY TIMETABLE GRID ===== -->
+<div class="cs-timetable-wrapper mb-4">
+  <table class="cs-timetable-grid">
+    <thead>
+      <tr>
+        <th class="period-col-header text-muted">
+          <i class="bi bi-clock me-1"></i> Period
+        </th>
+        {% for d in grid.days %}
+          <th class="day-header {% if d.is_today %}is-today{% endif %}">
+            <div class="d-flex align-items-center justify-content-center gap-2">
+              <span>{{ d.name }}</span>
+              {% if d.is_today %}
+                <span class="cs-badge info" style="font-size:0.65rem; padding:0.15rem 0.4rem;">Today</span>
+              {% endif %}
+            </div>
+          </th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in grid.grid_rows %}
+        {% if row.is_break %}
+          <tr>
+            <td class="period-cell break-row-cell">
+              <span class="small fw-bold">{{ row.time }}</span>
+            </td>
+            <td colspan="5" class="break-row-cell">
+              <i class="bi bi-cup-hot me-1"></i> {{ row.label }} &bull; {{ row.time }}
+            </td>
+          </tr>
+        {% else %}
+          <tr>
+            <td class="period-cell">
+              <div class="period-badge">P{{ row.period }}</div>
+              <div class="period-time">{{ row.time }}</div>
+            </td>
+            {% for cell in row.cells %}
+              <td class="slot-cell {% if cell.is_today %}is-today-col{% endif %}">
+                {% if cell.slots %}
+                  <div class="d-flex flex-column gap-2 h-100">
+                    {% for slot in cell.slots %}
+                      <div class="cs-timetable-card {{ slot.theme_class }}">
+                        <div class="card-top">
+                          <span class="course-code">{{ slot.section.course.code }}</span>
+                          <span class="cs-badge neutral" style="font-size:0.68rem; padding:0.1rem 0.35rem;">
+                            Sec {{ slot.section.name }}
+                          </span>
+                        </div>
+                        <div class="course-name text-truncate" title="{{ slot.section.course.name }}">
+                          {{ slot.section.course.name }}
+                        </div>
+                        <div class="card-meta">
+                          <span><i class="bi bi-person"></i>{{ slot.section.faculty.get_full_name|default:"TBD" }}</span>
+                          {% if slot.section.room %}
+                            <span><i class="bi bi-geo-alt"></i>{{ slot.section.room }}</span>
+                          {% endif %}
+                        </div>
+                        <div class="d-flex gap-1 justify-content-end mt-1 pt-1 border-top" style="font-size:0.75rem;">
+                          <a href="{% url 'admin_panel:timetable_edit' slot.pk %}" class="text-primary me-2" title="Edit Slot">
+                            <i class="bi bi-pencil"></i>
+                          </a>
+                          <form method="post" action="{% url 'admin_panel:timetable_delete' slot.pk %}" style="display:inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="border-0 bg-transparent text-danger p-0" title="Delete Slot" onclick="return confirm('Delete this slot?');">
+                              <i class="bi bi-trash"></i>
+                            </button>
+                          </form>
+                        </div>
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% else %}
+                  <div class="cs-timetable-empty">
+                    <span>Free</span>
+                  </div>
+                {% endif %}
+              </td>
+            {% endfor %}
+          </tr>
+        {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% else %}
+<!-- ===== TABULAR LIST VIEW ===== -->
 <div class="cs-table-wrapper">
   <table class="cs-table">
-    <thead><tr><th>Section</th><th>Day</th><th>Period</th><th>Time</th><th>Actions</th></tr></thead>
+    <thead>
+      <tr>
+        <th>Day</th>
+        <th>Period</th>
+        <th>Time</th>
+        <th>Course</th>
+        <th>Section</th>
+        <th>Faculty</th>
+        <th>Room</th>
+        <th style="text-align:right;">Actions</th>
+      </tr>
+    </thead>
     <tbody>
     {% for slot in slots %}
-    <tr>
-      <td class="fw-600">{{ slot.section }}</td>
-      <td>{{ slot.get_day_display }}</td>
-      <td>P{{ slot.period_number }}</td>
-      <td>{{ slot.start_time|time:"H:i" }} – {{ slot.end_time|time:"H:i" }}</td>
-      <td>
-        <div class="d-flex gap-2">
-          <a href="{% url 'admin_panel:timetable_edit' slot.pk %}" class="btn-cs-secondary" style="font-size:0.78rem;padding:0.3rem 0.7rem;"><i class="bi bi-pencil"></i></a>
-          <form method="post" action="{% url 'admin_panel:timetable_delete' slot.pk %}">
-            {% csrf_token %}
-            <button class="btn-cs-danger" style="font-size:0.78rem;padding:0.3rem 0.7rem;" onclick="return confirm('Delete this slot?')"><i class="bi bi-trash"></i></button>
-          </form>
-        </div>
-      </td>
-    </tr>
+      <tr>
+        <td class="fw-600">{{ slot.get_day_display }}</td>
+        <td><span class="cs-badge info">P{{ slot.period_number }}</span></td>
+        <td>{{ slot.start_time|time:"H:i" }} – {{ slot.end_time|time:"H:i" }}</td>
+        <td class="fw-600">{{ slot.section.course.code }}: {{ slot.section.course.name }}</td>
+        <td>Section {{ slot.section.name }}</td>
+        <td>{{ slot.section.faculty.get_full_name|default:"—" }}</td>
+        <td>{{ slot.section.room|default:"—" }}</td>
+        <td style="text-align:right;">
+          <div class="d-inline-flex gap-2">
+            <a href="{% url 'admin_panel:timetable_edit' slot.pk %}" class="btn-cs-secondary" style="font-size:0.78rem;padding:0.3rem 0.7rem;" title="Edit">
+              <i class="bi bi-pencil"></i>
+            </a>
+            <form method="post" action="{% url 'admin_panel:timetable_delete' slot.pk %}" style="display:inline;">
+              {% csrf_token %}
+              <button type="submit" class="btn-cs-danger" style="font-size:0.78rem;padding:0.3rem 0.7rem;" onclick="return confirm('Delete this slot?')" title="Delete">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+          </div>
+        </td>
+      </tr>
     {% empty %}
-    <tr><td colspan="5" class="text-muted text-center py-4">No timetable slots.</td></tr>
+      <tr><td colspan="8" class="text-muted text-center py-4">No timetable slots found matching the criteria.</td></tr>
     {% endfor %}
     </tbody>
   </table>
 </div>
+{% endif %}
 {% endblock %}

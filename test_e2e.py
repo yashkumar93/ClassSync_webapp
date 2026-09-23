@@ -45,9 +45,12 @@ faculty = slot.section.faculty
 student = slot.section.students.first()
 today = timezone.localdate()
 
-# Delete any existing session for this test
+# Delete any existing session or test absence for this test
 AttendanceSession.objects.filter(timetable_slot=slot, date=today).delete()
 AttendanceRecord.objects.filter(session__timetable_slot=slot, session__date=today).delete()
+AbsenceReport.objects.filter(timetable_slot=slot, date=today).delete()
+from attendance.services import get_effective_faculty
+faculty = get_effective_faculty(slot, today)
 
 # Faculty generates OTP
 session = generate_otp(slot, today, faculty)
@@ -177,6 +180,12 @@ print("\n=== Test 7: Admin Panel CRUD ===")
 c = Client()
 c.post('/login/', {'username': 'admin_demo', 'password': 'Admin@1234'})
 
+# Clean up prior test objects if they exist
+from core.models import Department, Course, User
+Course.objects.filter(code='TEST101').delete()
+Department.objects.filter(code='TEST').delete()
+User.objects.filter(username='testfaculty').delete()
+
 # Create department
 r = c.post('/admin-panel/departments/create/', {
     'name': 'Test Department', 'code': 'TEST'
@@ -206,7 +215,7 @@ assert_eq("User created", r.status_code, 302)
 # System config update
 config = SystemConfig.get()
 r = c.post('/admin-panel/config/', {
-    'otp_validity_seconds': 120,
+    'otp_validity_seconds': 60,
     'attendance_threshold': 80,
     'risk_missed_submissions': 3,
     'risk_window_days': 30,
@@ -214,7 +223,7 @@ r = c.post('/admin-panel/config/', {
 })
 assert_eq("Config updated", r.status_code, 302)
 config.refresh_from_db()
-assert_eq("OTP validity updated", config.otp_validity_seconds, 120)
+assert_eq("OTP validity updated", config.otp_validity_seconds, 60)
 
 # Send announcement
 r = c.post('/admin-panel/announce/', {

@@ -76,10 +76,24 @@ class AbsenceReport(models.Model):
         limit_choices_to={"role": "faculty"},
         related_name="proposed_substitutions",
     )
+    notified_substitutes = models.ManyToManyField(
+        User,
+        blank=True,
+        limit_choices_to={"role": "faculty"},
+        related_name="substitution_requests_received",
+        help_text="All eligible faculty who received this substitution request.",
+    )
+    declined_substitutes = models.ManyToManyField(
+        User,
+        blank=True,
+        limit_choices_to={"role": "faculty"},
+        related_name="substitution_requests_declined",
+        help_text="Faculty who explicitly declined this substitution request.",
+    )
     confirmation_deadline = models.DateTimeField(
         null=True,
         blank=True,
-        help_text="Deadline by which the proposed substitute must confirm.",
+        help_text="Deadline by which a substitute must confirm.",
     )
     is_makeup_candidate = models.BooleanField(
         default=False,

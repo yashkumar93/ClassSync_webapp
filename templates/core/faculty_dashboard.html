@@ -12,7 +12,7 @@
   <i class="bi bi-hourglass-split"></i>
   <div>
     <strong>Substitution Request:</strong> You have been proposed to cover
-    <strong>{{ report.timetable_slot.section.course.name }}</strong> (Section {{ report.timetable_slot.section.name }})
+    <strong>{{ report.timetable_slot.section.course.code }}: {{ report.timetable_slot.section.course.name }}</strong> (Section {{ report.timetable_slot.section.name }})
     on <strong>{{ report.date }}</strong> at {{ report.timetable_slot.start_time|time:"H:i" }}.
     <em>{{ report.faculty.get_full_name }}</em> is absent.
     &mdash;
@@ -35,26 +35,70 @@
 
 <div class="row g-3">
   <!-- Today's classes -->
-  <div class="col-lg-6">
+  <div class="col-lg-7">
     <div class="cs-card">
-      <div class="cs-card-header">
-        <h5><i class="bi bi-calendar-day me-2"></i>Today's Classes</h5>
+      <div class="cs-card-header d-flex justify-content-between align-items-center">
+        <h5><i class="bi bi-calendar-day me-2"></i>Today's Classes ({{ today|date:"l, F j" }})</h5>
+        <a href="{% url 'core:faculty_timetable' %}" class="btn-cs-secondary" style="font-size:0.8rem;">
+          <i class="bi bi-calendar3"></i> Weekly Timetable
+        </a>
       </div>
       <div class="cs-card-body" style="padding:0;">
         {% if today_slots %}
           <div class="cs-table-wrapper" style="border:none;box-shadow:none;border-radius:0;">
             <table class="cs-table">
-              <thead><tr><th>Period</th><th>Course / Section</th><th>Time</th><th>OTP</th></tr></thead>
+              <thead>
+                <tr>
+                  <th>Period</th>
+                  <th>Course &amp; Section</th>
+                  <th>Room</th>
+                  <th>Time</th>
+                  <th style="text-align:right;">Action</th>
+                </tr>
+              </thead>
               <tbody>
               {% for slot in today_slots %}
               <tr>
-                <td>P{{ slot.timetable_slots__period_number }}</td>
-                <td>{{ slot.course__name }} — Sec {{ slot.name }}</td>
-                <td>{{ slot.timetable_slots__start_time|time:"H:i" }}</td>
+                <td><span class="cs-badge info fw-bold">P{{ slot.timetable_slots__period_number }}</span></td>
                 <td>
-                  <a href="{% url 'attendance:generate_otp' slot_id=slot.timetable_slots__id date_str=today|date:'Y-m-d' %}" class="btn-cs-primary" style="font-size:0.78rem;padding:0.3rem 0.7rem;">
-                    <i class="bi bi-123"></i> Generate OTP
-                  </a>
+                  <div class="fw-600">{{ slot.course__code }}: {{ slot.course__name }}</div>
+                  <div class="text-muted small">Section {{ slot.name }}
+                    {% if slot.is_substitute %}
+                      <span class="cs-badge warning" style="font-size:0.7rem; padding:0.1rem 0.4rem; margin-left:0.25rem;">
+                        <i class="bi bi-arrow-left-right"></i> Substitute
+                      </span>
+                    {% endif %}
+                  </div>
+                </td>
+                <td>
+                  <span class="text-muted small"><i class="bi bi-geo-alt"></i> {{ slot.room|default:"—" }}</span>
+                </td>
+                <td>
+                  <span class="small fw-600">{{ slot.timetable_slots__start_time|time:"H:i" }} &ndash; {{ slot.timetable_slots__end_time|time:"H:i" }}</span>
+                </td>
+                <td style="text-align:right;">
+                  {% if now_time >= slot.timetable_slots__start_time and now_time <= slot.timetable_slots__end_time %}
+                    <span class="cs-badge success me-1" style="font-size:0.7rem; padding:0.15rem 0.45rem;">
+                      <i class="bi bi-broadcast"></i> In Session
+                    </span>
+                    <a href="{% url 'attendance:generate_otp' slot_id=slot.timetable_slots__id date_str=today|date:'Y-m-d' %}" class="btn-cs-primary" style="font-size:0.78rem;padding:0.3rem 0.7rem;">
+                      <i class="bi bi-123"></i> Generate OTP
+                    </a>
+                  {% elif now_time < slot.timetable_slots__start_time %}
+                    <span class="cs-badge neutral me-1" style="font-size:0.72rem;">
+                      <i class="bi bi-clock"></i> Starts {{ slot.timetable_slots__start_time|time:"H:i" }}
+                    </span>
+                    <a href="{% url 'attendance:generate_otp' slot_id=slot.timetable_slots__id date_str=today|date:'Y-m-d' %}" class="btn-cs-secondary" style="font-size:0.75rem;padding:0.25rem 0.6rem;">
+                      <i class="bi bi-123"></i> Setup OTP
+                    </a>
+                  {% else %}
+                    <span class="cs-badge neutral me-1" style="font-size:0.72rem;">
+                      <i class="bi bi-check2"></i> Ended
+                    </span>
+                    <a href="{% url 'attendance:generate_otp' slot_id=slot.timetable_slots__id date_str=today|date:'Y-m-d' %}" class="btn-cs-secondary" style="font-size:0.75rem;padding:0.25rem 0.6rem;">
+                      <i class="bi bi-clock-history"></i> Manage OTP
+                    </a>
+                  {% endif %}
                 </td>
               </tr>
               {% endfor %}
@@ -69,7 +113,7 @@
   </div>
 
   <!-- My Sections -->
-  <div class="col-lg-6">
+  <div class="col-lg-5">
     <div class="cs-card">
       <div class="cs-card-header">
         <h5><i class="bi bi-diagram-3 me-2"></i>My Sections</h5>
@@ -81,7 +125,7 @@
             <tbody>
             {% for section in sections %}
             <tr>
-              <td>{{ section.course.code }}</td>
+              <td><strong>{{ section.course.code }}</strong>: {{ section.course.name }}</td>
               <td>{{ section.name }}</td>
               <td>{{ section.students.count }}</td>
               <td>
@@ -127,7 +171,7 @@
           {% for a in recent_absences %}
           <tr>
             <td>{{ a.date }}</td>
-            <td>{{ a.timetable_slot.section.course.name }}</td>
+            <td>{{ a.timetable_slot.section.course.code }}: {{ a.timetable_slot.section.course.name }}</td>
             <td>
               {% if a.status == 'reassigned' %}
                 <span class="cs-badge success"><i class="bi bi-check-circle"></i> Reassigned</span>

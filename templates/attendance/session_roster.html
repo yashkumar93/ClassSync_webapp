@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}Session Attendance — {{ section.course.code }}: {{ section.course.name }} ({{ session.date }}){% endblock %}
+
+{% block content %}
+<div class="cs-page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <div>
+    <h1><i class="bi bi-person-check me-2" style="color:var(--cs-primary);"></i>Session Attendance Roster</h1>
+    <div class="subtitle">
+      <span class="cs-badge primary me-1" style="font-size:0.75rem;">{{ section.course.code }}</span>{{ section.course.name }} &mdash; Section {{ section.name }} &bull; {{ session.date|date:"l, F j, Y" }} (Period {{ slot.period_number }})
+    </div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap align-items-center">
+    {% if session.is_active %}
+    <a href="{% url 'attendance:session_display' session_id=session.pk %}" class="btn-cs-secondary" style="font-size:0.85rem;">
+      <i class="bi bi-projector"></i> View OTP Projector
+    </a>
+    {% endif %}
+
+    <form method="post" action="{% url 'attendance:finalize_session' session_id=session.pk %}" style="display:inline;">
+      {% csrf_token %}
+      <button type="submit" class="btn-cs-primary" style="font-size:0.85rem;" onclick="return confirm('Finalize attendance for this session? Any student without attendance marked will be marked ABSENT and alert notifications will be sent to both students and faculty.');">
+        <i class="bi bi-shield-check"></i> Finalize Attendance &amp; Notify Absentees
+      </button>
+    </form>
+
+    <a href="{% url 'attendance:section_dashboard' section_id=section.pk %}" class="btn-cs-secondary" style="font-size:0.85rem;">
+      <i class="bi bi-arrow-left"></i> Section Dashboard
+    </a>
+  </div>
+</div>
+
+<!-- Session Stats Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-lg-3">
+    <div class="cs-card p-3 d-flex align-items-center gap-3">
+      <div style="width:48px;height:48px;border-radius:10px;background:rgba(26,86,160,0.1);display:flex;align-items:center;justify-content:center;color:var(--cs-primary);font-size:1.5rem;">
+        <i class="bi bi-calendar-event"></i>
+      </div>
+      <div>
+        <div class="text-muted small">Status</div>
+        <div class="fw-bold">
+          {% if session.is_active %}
+            <span class="text-success"><i class="bi bi-record-fill"></i> Active</span>
+          {% else %}
+            <span class="text-muted"><i class="bi bi-clock-history"></i> Ended</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-lg-3">
+    <div class="cs-card p-3 d-flex align-items-center gap-3">
+      <div style="width:48px;height:48px;border-radius:10px;background:rgba(40,167,69,0.1);display:flex;align-items:center;justify-content:center;color:var(--cs-success);font-size:1.5rem;">
+        <i class="bi bi-check-circle"></i>
+      </div>
+      <div>
+        <div class="text-muted small">Present</div>
+        <div class="fw-bold fs-5 text-success">{{ present_count }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-lg-3">
+    <div class="cs-card p-3 d-flex align-items-center gap-3">
+      <div style="width:48px;height:48px;border-radius:10px;background:rgba(220,53,69,0.1);display:flex;align-items:center;justify-content:center;color:var(--cs-danger);font-size:1.5rem;">
+        <i class="bi bi-x-circle"></i>
+      </div>
+      <div>
+        <div class="text-muted small">Absent</div>
+        <div class="fw-bold fs-5 text-danger">{{ absent_count }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-lg-3">
+    <div class="cs-card p-3 d-flex align-items-center gap-3">
+      <div style="width:48px;height:48px;border-radius:10px;background:rgba(108,117,125,0.1);display:flex;align-items:center;justify-content:center;color:#6c757d;font-size:1.5rem;">
+        <i class="bi bi-person-badge"></i>
+      </div>
+      <div>
+        <div class="text-muted small">Faculty</div>
+        <div class="fw-bold small">{{ effective_faculty.get_full_name|default:session.generated_by.get_full_name }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Alert Banner -->
+<div class="alert alert-info d-flex align-items-center gap-2 mb-4" role="alert" style="border-radius:8px;">
+  <i class="bi bi-bell-fill fs-5"></i>
+  <div>
+    <strong>Absence Alert Integration:</strong> When a student is marked <strong>Absent</strong> (either when attendance is finalized or toggled manually), an alert notification is automatically dispatched to <strong>both the student and the faculty</strong>.
+  </div>
+</div>
+
+<!-- Roster Table -->
+<div class="cs-card">
+  <div class="cs-card-header d-flex justify-content-between align-items-center">
+    <h5><i class="bi bi-people me-2"></i>Enrolled Students ({{ student_rows|length }})</h5>
+    {% if session.absences_processed %}
+      <span class="cs-badge success"><i class="bi bi-check2-all"></i> Absences Processed</span>
+    {% else %}
+      <span class="cs-badge warning"><i class="bi bi-hourglass-split"></i> Pending Finalization</span>
+    {% endif %}
+  </div>
+
+  <div class="cs-table-wrapper" style="border:none;box-shadow:none;border-radius:0;">
+    <table class="cs-table" id="rosterTable">
+      <thead>
+        <tr>
+          <th>Student</th>
+          <th>Roll No.</th>
+          <th>Status</th>
+          <th>Recorded At</th>
+          <th style="text-align:right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for row in student_rows %}
+        <tr>
+          <td class="fw-600">
+            <i class="bi bi-person-circle me-1 text-muted"></i>
+            {{ row.student.get_full_name }}
+          </td>
+          <td>{{ row.student.roll_number|default:"—" }}</td>
+          <td>
+            {% if row.status == "present" %}
+              <span class="cs-badge success"><i class="bi bi-check-circle-fill"></i> Present</span>
+            {% elif row.status == "absent" %}
+              <span class="cs-badge danger"><i class="bi bi-x-circle-fill"></i> Absent</span>
+            {% else %}
+              <span class="cs-badge neutral"><i class="bi bi-dash-circle"></i> Unmarked</span>
+            {% endif %}
+          </td>
+          <td class="text-muted small">
+            {% if row.record %}
+              {{ row.record.marked_at|time:"H:i:s" }}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td style="text-align:right;">
+            {% if row.status == "present" %}
+              <form method="post" action="{% url 'attendance:toggle_attendance' session_id=session.pk student_id=row.student.pk %}" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="target_status" value="absent">
+                <button type="submit" class="btn btn-sm btn-outline-danger" style="font-size:0.75rem; padding:0.25rem 0.6rem;" onclick="return confirm('Mark {{ row.student.get_full_name }} ABSENT? This will send an alert notification to both the student and the faculty.');">
+                  <i class="bi bi-x-circle"></i> Mark Absent
+                </button>
+              </form>
+            {% else %}
+              <form method="post" action="{% url 'attendance:toggle_attendance' session_id=session.pk student_id=row.student.pk %}" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="target_status" value="present">
+                <button type="submit" class="btn btn-sm btn-outline-success" style="font-size:0.75rem; padding:0.25rem 0.6rem;">
+                  <i class="bi bi-check-circle"></i> Mark Present
+                </button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="5" class="text-muted text-center py-4">No students enrolled in this section.</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

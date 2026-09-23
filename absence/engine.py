@@ -117,15 +117,11 @@ def find_eligible_substitutes(report: AbsenceReport):
     return eligible
 
 
-def propose_next_substitute(report: AbsenceReport):
+def broadcast_substitution_request(report: AbsenceReport):
     """
-    Pick the best eligible substitute for `report` and propose them:
-    - Sets report.proposed_substitute and report.confirmation_deadline.
-    - Sets report.status = 'pending_confirmation'.
-    - Saves the report.
-    - Returns the proposed substitute User, or None if nobody is available.
-
-    Tie-breaking: among the lowest-count group → random choice (logged).
+    Broadcast the substitution request to all eligible faculty members simultaneously.
+    Each eligible faculty member receives a notification and sees the Accept/Decline options.
+    Whoever accepts first is assigned to cover the class.
     """
     config = SystemConfig.get()
     eligible = find_eligible_substitutes(report)
@@ -134,60 +130,64 @@ def propose_next_substitute(report: AbsenceReport):
         logger.info("No eligible substitutes for AbsenceReport pk=%s", report.pk)
         return None
 
-    candidates = list(eligible)
-    min_count = candidates[0].sub_count
-
-    # All candidates tied at the minimum count
-    tied = [c for c in candidates if c.sub_count == min_count]
-    is_tiebreak = len(tied) > 1
-
-    chosen = random.choice(tied)
-
     deadline = timezone.now() + timedelta(minutes=config.confirmation_window_minutes)
 
-    report.proposed_substitute = chosen
     report.confirmation_deadline = deadline
     report.status = AbsenceReport.STATUS_PENDING_CONFIRMATION
-    report.save(update_fields=["proposed_substitute", "confirmation_deadline", "status", "updated_at"])
+    report.proposed_substitute = None
+    report.save(update_fields=["confirmation_deadline", "status", "proposed_substitute", "updated_at"])
+
+    # Set all eligible faculty as notified and clear any previous declines
+    report.notified_substitutes.set(eligible)
+    report.declined_substitutes.clear()
 
     logger.info(
-        "Proposed substitute %s (sub_count=%d, tiebreak=%s) for AbsenceReport pk=%s. Deadline: %s",
-        chosen.get_full_name(),
-        min_count,
-        is_tiebreak,
+        "Broadcasted substitution request for AbsenceReport pk=%s to %d eligible faculty. Deadline: %s",
         report.pk,
+        eligible.count(),
         deadline,
     )
 
-    # Notify the proposed substitute
-    _notify_proposed_substitute(report, chosen, is_tiebreak)
+    # Notify every eligible candidate
+    for candidate in eligible:
+        _notify_proposed_substitute(report, candidate, is_tiebreak=False)
 
-    return chosen
+    return eligible
 
 
-def confirm_substitution(report: AbsenceReport):
+def propose_next_substitute(report: AbsenceReport):
     """
-    Called when the proposed substitute explicitly accepts.
-    Finalises the SubstitutionRecord and notifies students.
+    Broadcasts the substitution request to all eligible faculty members.
+    Retained for backwards-compatibility with existing calls.
+    """
+    eligible = broadcast_substitution_request(report)
+    return eligible.first() if eligible and eligible.exists() else None
+
+
+def confirm_substitution(report: AbsenceReport, substitute_faculty=None):
+    """
+    Called when an eligible substitute accepts the request.
+    Finalises the SubstitutionRecord, marks status as reassigned,
+    and notifies students, the substitute, and the absent faculty.
     """
     if report.status != AbsenceReport.STATUS_PENDING_CONFIRMATION:
         raise ValueError("Report is not in pending_confirmation state.")
-    if report.proposed_substitute is None:
-        raise ValueError("No proposed substitute to confirm.")
 
-    sub = report.proposed_substitute
-    # Determine if random tie-break was used (re-check: if sub_count was tied when proposed)
-    # We store this flag in the record from the proposal step; here we just create the record.
-    _, was_tiebreak = _was_random_tiebreak(report)
+    sub = substitute_faculty or report.proposed_substitute or report.notified_substitutes.first()
+    if sub is None:
+        raise ValueError("No substitute provided to confirm.")
 
-    SubstitutionRecord.objects.create(
+    report.proposed_substitute = sub
+    SubstitutionRecord.objects.update_or_create(
         absence_report=report,
-        substitute_faculty=sub,
-        was_random_tiebreak=was_tiebreak,
+        defaults={
+            "substitute_faculty": sub,
+            "was_random_tiebreak": False,
+        },
     )
 
     report.status = AbsenceReport.STATUS_REASSIGNED
-    report.save(update_fields=["status", "updated_at"])
+    report.save(update_fields=["proposed_substitute", "status", "updated_at"])
 
     logger.info(
         "Substitution confirmed: %s will cover %s.",
@@ -195,33 +195,33 @@ def confirm_substitution(report: AbsenceReport):
         report,
     )
 
-    # Notify students
+    # Notify students & absent faculty
     _notify_students_reassignment(report)
+    _notify_faculty_reassignment(report, sub)
 
 
-def decline_or_timeout(report: AbsenceReport):
+def decline_or_timeout(report: AbsenceReport, declining_faculty=None):
     """
-    Called when a proposed substitute declines or the confirmation window expires.
-    Falls through to the next eligible candidate, or self-study if none remain.
+    Called when a faculty declines or the deadline passes.
+    If declining_faculty is provided, they are marked as declined.
+    If all notified faculty have declined or the deadline expired with 0 accepts,
+    the class falls back to self-study.
     """
-    if report.proposed_substitute:
+    if declining_faculty:
+        report.declined_substitutes.add(declining_faculty)
         logger.info(
-            "Substitute %s declined/timed out for AbsenceReport pk=%s. Trying next.",
-            report.proposed_substitute.get_full_name(),
+            "Faculty %s declined substitution request for AbsenceReport pk=%s.",
+            declining_faculty.get_full_name(),
             report.pk,
         )
-
-    # Clear current proposal
-    report.proposed_substitute = None
-    report.confirmation_deadline = None
-    report.status = AbsenceReport.STATUS_PENDING
-    report.save(update_fields=["proposed_substitute", "confirmation_deadline", "status", "updated_at"])
-
-    # Try the next candidate
-    next_candidate = propose_next_substitute(report)
-
-    if next_candidate is None:
-        # No more candidates → self-study fallback
+        # Check if any eligible faculty remain who have NOT declined
+        remaining = report.notified_substitutes.exclude(id__in=report.declined_substitutes.all())
+        if not remaining.exists():
+            logger.info("All notified substitutes declined AbsenceReport pk=%s. Falling back to self-study.", report.pk)
+            mark_self_study(report)
+    else:
+        # Full timeout: deadline passed without any acceptance
+        logger.info("Confirmation deadline expired for AbsenceReport pk=%s. Falling back to self-study.", report.pk)
         mark_self_study(report)
 
 
@@ -279,6 +279,21 @@ def _notify_students_reassignment(report):
             ),
             related_object_id=report.pk,
         )
+
+
+def _notify_faculty_reassignment(report, sub):
+    from notifications.utils import create_notification
+    slot = report.timetable_slot
+    create_notification(
+        recipient=report.faculty,
+        notif_type="class_reassigned",
+        message=(
+            f"{sub.get_full_name()} has accepted your substitution request and will cover your "
+            f"{slot.section.course.name} class on {report.date} at {slot.start_time:%H:%M}."
+        ),
+        related_object_id=report.pk,
+    )
+
 
 
 def _notify_students_self_study(report):

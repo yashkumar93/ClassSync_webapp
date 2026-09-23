@@ -76,7 +76,7 @@
             {% for r in recent_absences %}
             <tr>
               <td class="fw-600">{{ r.faculty.get_full_name }}</td>
-              <td>{{ r.timetable_slot.section.course.name }}</td>
+              <td>{{ r.timetable_slot.section.course.code }}: {{ r.timetable_slot.section.course.name }}</td>
               <td>{{ r.date }}</td>
               <td>
                 {% if r.status == 'reassigned' %}

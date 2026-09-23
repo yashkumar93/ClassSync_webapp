@@ -55,11 +55,12 @@ test_page(c, '/notifications/read-all/', expected=302)
 # ===== FACULTY =====
 c.logout()
 print("\n=== Faculty Login ===")
-r = c.post('/login/', {'username': 'alice.sharma', 'password': 'Faculty@1234'})
+r = c.post('/login/', {'username': 'dr.naseer', 'password': 'Faculty@1234'})
 print(f"  Login: {r.status_code}")
 
 print("\n=== Faculty Pages ===")
 test_page(c, '/faculty/dashboard/')
+test_page(c, '/faculty/timetable/')
 test_page(c, '/absence/report/')
 test_page(c, '/absence/my/')
 test_page(c, '/absence/opt-in/')
@@ -71,7 +72,7 @@ test_page(c, '/notifications/risk-flags/')
 
 # Test attendance section dashboard
 from core.models import Section
-section = Section.objects.filter(faculty__username='alice.sharma').first()
+section = Section.objects.filter(faculty__username='dr.naseer').first()
 if section:
     test_page(c, f'/attendance/dashboard/{section.pk}/')
 
@@ -84,11 +85,12 @@ if assignment:
 # ===== STUDENT =====
 c.logout()
 print("\n=== Student Login ===")
-r = c.post('/login/', {'username': 's001', 'password': 'Student@1234'})
+r = c.post('/login/', {'username': '23BCS1001', 'password': 'Student@1234'})
 print(f"  Login: {r.status_code}")
 
 print("\n=== Student Pages ===")
 test_page(c, '/student/dashboard/')
+test_page(c, '/student/timetable/')
 test_page(c, '/attendance/mark/')
 test_page(c, '/attendance/my/')
 test_page(c, '/assignments/student/')

@@ -25,7 +25,7 @@
       {% endif %}
     </div>
     <div class="cs-card-body" style="padding:0.85rem 1rem;">
-      <div class="fs-sm text-muted mb-1">{{ item.assignment.section.course.name }}</div>
+      <div class="fs-sm text-muted mb-1"><span class="cs-badge neutral me-1" style="font-size:0.7rem;">{{ item.assignment.section.course.code }}</span>{{ item.assignment.section.course.name }}</div>
       <div class="fs-sm">
         <i class="bi bi-calendar-event {% if item.is_past_due %}text-danger{% else %}text-warning{% endif %}"></i>
         Due: <strong>{{ item.assignment.due_date|date:"d M Y, H:i" }}</strong>

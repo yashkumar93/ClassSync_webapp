@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Generate OTP — {{ slot.section.course.name }}{% endblock %}
+{% block title %}Generate OTP — {{ slot.section.course.code }}: {{ slot.section.course.name }}{% endblock %}
 {% block content %}
 <div class="cs-page-header">
   <h1><i class="bi bi-qr-code me-2" style="color:var(--cs-primary);"></i>Generate Attendance Code</h1>
@@ -25,6 +25,37 @@
     </div>
   </div>
 
+  <!-- Class Timing Status Banner -->
+  {% if is_class_time %}
+    <div class="cs-alert success" style="margin-bottom:1.25rem;">
+      <i class="bi bi-broadcast"></i>
+      <div>
+        <strong>Class in session:</strong> Currently within scheduled class timings ({{ slot.start_time|time:"H:i" }} – {{ slot.end_time|time:"H:i" }}). Ready to generate attendance OTP.
+      </div>
+    </div>
+  {% elif is_before_class %}
+    <div class="cs-alert info" style="margin-bottom:1.25rem;">
+      <i class="bi bi-clock"></i>
+      <div>
+        <strong>Class not started yet:</strong> This class is scheduled for <strong>{{ slot.start_time|time:"H:i" }} – {{ slot.end_time|time:"H:i" }}</strong> (current time: {{ now_time|time:"H:i" }}).
+      </div>
+    </div>
+  {% elif is_after_class %}
+    <div class="cs-alert warning" style="margin-bottom:1.25rem;">
+      <i class="bi bi-clock-history"></i>
+      <div>
+        <strong>Class time has ended:</strong> Scheduled timing was <strong>{{ slot.start_time|time:"H:i" }} – {{ slot.end_time|time:"H:i" }}</strong>.
+      </div>
+    </div>
+  {% elif not is_today or not is_correct_day %}
+    <div class="cs-alert danger" style="margin-bottom:1.25rem;">
+      <i class="bi bi-calendar-x"></i>
+      <div>
+        <strong>Outside scheduled class day:</strong> This class is scheduled for <strong>{{ slot.get_day_display }}s</strong>.
+      </div>
+    </div>
+  {% endif %}
+
   {% if existing_session %}
   <div class="cs-alert warning" style="margin-bottom:1.25rem;">
     <i class="bi bi-exclamation-triangle"></i>
@@ -42,18 +73,28 @@
   {% endif %}
 
   <div class="cs-alert info" style="margin-bottom:1.5rem;">
-    <i class="bi bi-info-circle"></i>
+    <i class="bi bi-stopwatch"></i>
     <div>
-      The OTP will be valid for <strong>{{ validity_seconds }} seconds</strong>.
+      The OTP will be valid for <strong>{{ validity_seconds }} seconds</strong> (60s timer).
       Display it on the projector so students can see and enter it.
     </div>
   </div>
 
   <form method="post">
     {% csrf_token %}
+    {% if not is_class_time %}
+    <div class="p-3 mb-3" style="background:rgba(255, 193, 7, 0.12); border:1px dashed var(--cs-warning); border-radius:8px;">
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="allow_timing_override" id="timingOverride" {% if user.role == 'admin' %}checked{% endif %}>
+        <label class="form-check-label fs-sm" for="timingOverride">
+          <strong>Allow timing override</strong> (generate outside scheduled class timings for testing, demo, or makeup class)
+        </label>
+      </div>
+    </div>
+    {% endif %}
     <button type="submit" class="btn-cs-primary" style="width:100%; justify-content:center; padding:0.7rem; font-size:1rem;">
       <i class="bi bi-shield-lock"></i>
-      {% if existing_session %}Regenerate OTP{% else %}Generate OTP{% endif %}
+      {% if existing_session %}Regenerate 60s OTP{% else %}Generate 60s OTP{% endif %}
     </button>
   </form>
 

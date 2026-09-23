@@ -101,6 +101,9 @@
     <a href="{% url 'core:faculty_dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'faculty_dashboard' %}active{% endif %}">
       <i class="bi bi-grid-1x2"></i> Dashboard
     </a>
+    <a href="{% url 'core:faculty_timetable' %}" class="nav-link {% if request.resolver_match.url_name == 'faculty_timetable' %}active{% endif %}">
+      <i class="bi bi-calendar3"></i> Timetable
+    </a>
     <a href="{% url 'absence:report_absence' %}" class="nav-link">
       <i class="bi bi-calendar-x"></i> Report Absence
     </a>
@@ -125,6 +128,9 @@
     <span class="sidebar-section-label">Academics</span>
     <a href="{% url 'core:student_dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'student_dashboard' %}active{% endif %}">
       <i class="bi bi-grid-1x2"></i> Dashboard
+    </a>
+    <a href="{% url 'core:student_timetable' %}" class="nav-link {% if request.resolver_match.url_name == 'student_timetable' %}active{% endif %}">
+      <i class="bi bi-calendar3"></i> Timetable
     </a>
     <a href="{% url 'attendance:submit_otp' %}" class="nav-link">
       <i class="bi bi-check2-circle"></i> Mark Attendance

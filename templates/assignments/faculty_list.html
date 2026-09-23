@@ -12,7 +12,7 @@
     {% for a in assignments %}
     <tr>
       <td class="fw-600">{{ a.title }}</td>
-      <td>{{ a.section.course.code }} — {{ a.section.name }}</td>
+      <td><strong>{{ a.section.course.code }}</strong>: {{ a.section.course.name }} (Sec {{ a.section.name }})</td>
       <td>
         <span {% if a.is_past_due %}class="text-danger fw-600"{% endif %}>
           {{ a.due_date|date:"d M Y, H:i" }}

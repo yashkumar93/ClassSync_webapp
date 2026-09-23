@@ -15,7 +15,7 @@
     <tr>
       <td>{{ r.date }}</td>
       <td class="fw-600">{{ r.faculty.get_full_name }}</td>
-      <td>{{ r.timetable_slot.section.course.name }} ({{ r.timetable_slot.section.name }})</td>
+      <td>{{ r.timetable_slot.section.course.code }}: {{ r.timetable_slot.section.course.name }} ({{ r.timetable_slot.section.name }})</td>
       <td>
         {% if r.status == 'reassigned' %}<span class="cs-badge success">Reassigned</span>
         {% elif r.status == 'self_study' %}<span class="cs-badge warning">Self-Study</span>

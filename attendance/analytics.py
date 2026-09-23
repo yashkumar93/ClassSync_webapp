@@ -20,6 +20,7 @@ def attendance_percentage(student, section):
     attended = AttendanceRecord.objects.filter(
         session__timetable_slot__section=section,
         student=student,
+        status=AttendanceRecord.STATUS_PRESENT,
     ).count()
 
     return round((attended / total_sessions) * 100, 1)
@@ -42,6 +43,7 @@ def get_student_attendance_summary(student):
         attended = AttendanceRecord.objects.filter(
             session__timetable_slot__section=section,
             student=student,
+            status=AttendanceRecord.STATUS_PRESENT,
         ).count()
         pct = round((attended / total) * 100, 1) if total > 0 else 0.0
         summary.append({
@@ -73,6 +75,7 @@ def get_section_attendance_dashboard(section):
         attended = AttendanceRecord.objects.filter(
             session__timetable_slot__section=section,
             student=student,
+            status=AttendanceRecord.STATUS_PRESENT,
         ).count()
         pct = round((attended / total_sessions) * 100, 1) if total_sessions > 0 else 0.0
         rows.append({

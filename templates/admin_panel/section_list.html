@@ -11,7 +11,7 @@
     <tbody>
     {% for s in sections %}
     <tr>
-      <td class="fw-600">{{ s.course.code }}</td>
+      <td class="fw-600">{{ s.course.code }}: {{ s.course.name }}</td>
       <td>{{ s.name }}</td>
       <td>{{ s.faculty.get_full_name|default:"—" }}</td>
       <td>{{ s.room|default:"—" }}</td>

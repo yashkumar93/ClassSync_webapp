@@ -15,7 +15,7 @@
       <td>{{ r.timestamp|date:"d M Y" }}</td>
       <td>{{ r.absence_report.faculty.get_full_name }}</td>
       <td class="fw-600">{{ r.substitute_faculty.get_full_name }}</td>
-      <td>{{ r.absence_report.timetable_slot.section.course.name }}</td>
+      <td>{{ r.absence_report.timetable_slot.section.course.code }}: {{ r.absence_report.timetable_slot.section.course.name }}</td>
       <td>
         {% if r.was_random_tiebreak %}
           <span class="cs-badge neutral"><i class="bi bi-shuffle"></i> Random</span>

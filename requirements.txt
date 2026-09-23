@@ -4,4 +4,5 @@ django-crispy-forms>=2.3
 crispy-bootstrap5>=2024.2
 Pillow>=10.0
 APScheduler>=3.10
-mysqlclient>=2.2  # swap in for MySQL on staging/prod; comment out for SQLite dev
+psycopg[binary]>=3.2  # PostgreSQL / Supabase adapter
+# mysqlclient>=2.2    # uncomment for MySQL on staging/prod

@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}My Timetable{% endblock %}
+
+{% block content %}
+<div class="cs-page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <div>
+    <h1><i class="bi bi-calendar3 me-2" style="color:var(--cs-primary);"></i>My Teaching Timetable</h1>
+    <div class="subtitle">Weekly lecture and lab schedule &bull; {{ total_classes }} assigned class{{ total_classes|pluralize:"es" }}</div>
+  </div>
+  <div class="d-flex gap-2 align-items-center">
+    <a href="{% url 'absence:report_absence' %}" class="btn-cs-secondary" style="font-size:0.85rem;">
+      <i class="bi bi-calendar-x"></i> Report Absence
+    </a>
+    <a href="{% url 'core:faculty_dashboard' %}" class="btn-cs-primary" style="font-size:0.85rem;">
+      <i class="bi bi-grid-1x2"></i> Faculty Dashboard
+    </a>
+  </div>
+</div>
+
+<!-- Weekly Grid -->
+<div class="cs-timetable-wrapper mb-4">
+  <table class="cs-timetable-grid">
+    <thead>
+      <tr>
+        <th class="period-col-header text-muted">
+          <i class="bi bi-clock me-1"></i> Period
+        </th>
+        {% for d in grid.days %}
+          <th class="day-header {% if d.is_today %}is-today{% endif %}">
+            <div class="d-flex align-items-center justify-content-center gap-2">
+              <span>{{ d.name }}</span>
+              {% if d.is_today %}
+                <span class="cs-badge info" style="font-size:0.65rem; padding:0.15rem 0.4rem;">Today</span>
+              {% endif %}
+            </div>
+          </th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in grid.grid_rows %}
+        {% if row.is_break %}
+          <tr>
+            <td class="period-cell break-row-cell">
+              <span class="small fw-bold">{{ row.time }}</span>
+            </td>
+            <td colspan="5" class="break-row-cell">
+              <i class="bi bi-cup-hot me-1"></i> {{ row.label }} &bull; {{ row.time }}
+            </td>
+          </tr>
+        {% else %}
+          <tr>
+            <td class="period-cell">
+              <div class="period-badge">P{{ row.period }}</div>
+              <div class="period-time">{{ row.time }}</div>
+            </td>
+            {% for cell in row.cells %}
+              <td class="slot-cell {% if cell.is_today %}is-today-col{% endif %}">
+                {% if cell.slots %}
+                  {% for slot in cell.slots %}
+                    <div class="cs-timetable-card {{ slot.theme_class }}">
+                      <div class="card-top">
+                        <span class="course-code">{{ slot.section.course.code }}</span>
+                        <span class="cs-badge neutral" style="font-size:0.68rem; padding:0.1rem 0.35rem;">
+                          Sec {{ slot.section.name }}
+                        </span>
+                      </div>
+                      <div class="course-name" title="{{ slot.section.course.name }}">
+                        {{ slot.section.course.name }}
+                      </div>
+                      <div class="card-meta">
+                        {% if slot.section.room %}
+                          <span><i class="bi bi-geo-alt"></i>{{ slot.section.room }}</span>
+                        {% endif %}
+                        <span><i class="bi bi-people"></i>{{ slot.section.students.count }} students</span>
+                      </div>
+                      {% if cell.is_today %}
+                        <div class="mt-2 pt-1 border-top">
+                          <a href="{% url 'attendance:generate_otp' slot_id=slot.pk date_str=grid.today|date:'Y-m-d' %}"
+                             class="btn-cs-primary w-100 text-center"
+                             style="font-size:0.72rem; padding:0.25rem 0.5rem;">
+                            <i class="bi bi-123"></i> Generate OTP
+                          </a>
+                        </div>
+                      {% endif %}
+                    </div>
+                  {% endfor %}
+                {% else %}
+                  <div class="cs-timetable-empty">
+                    <span>Free Period</span>
+                  </div>
+                {% endif %}
+              </td>
+            {% endfor %}
+          </tr>
+        {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

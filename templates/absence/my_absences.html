@@ -14,7 +14,7 @@
     {% for a in absences %}
     <tr>
       <td>{{ a.date }}</td>
-      <td>{{ a.timetable_slot.section.course.name }}</td>
+      <td>{{ a.timetable_slot.section.course.code }}: {{ a.timetable_slot.section.course.name }}</td>
       <td>P{{ a.timetable_slot.period_number }} {{ a.timetable_slot.start_time|time:"H:i" }}</td>
       <td>
         {% if a.status == 'reassigned' %}<span class="cs-badge success"><i class="bi bi-check-circle"></i> Reassigned</span>

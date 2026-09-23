@@ -24,6 +24,10 @@ class AttendanceSession(models.Model):
         related_name="generated_sessions",
     )
     expires_at = models.DateTimeField()
+    absences_processed = models.BooleanField(
+        default=False,
+        help_text="Whether absent students have been identified and notified."
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -36,6 +40,14 @@ class AttendanceSession(models.Model):
     @property
     def is_active(self):
         return timezone.now() <= self.expires_at
+
+    @property
+    def present_count(self):
+        return self.records.filter(status="present").count()
+
+    @property
+    def absent_count(self):
+        return self.records.filter(status="absent").count()
 
     @classmethod
     def generate_otp(cls, timetable_slot, generated_by, validity_seconds):
@@ -58,6 +70,13 @@ class AttendanceSession(models.Model):
 
 class AttendanceRecord(models.Model):
     """Records a student's attendance for one session."""
+    STATUS_PRESENT = "present"
+    STATUS_ABSENT = "absent"
+    STATUS_CHOICES = [
+        (STATUS_PRESENT, "Present"),
+        (STATUS_ABSENT, "Absent"),
+    ]
+
     session = models.ForeignKey(
         AttendanceSession, on_delete=models.CASCADE, related_name="records"
     )
@@ -67,14 +86,20 @@ class AttendanceRecord(models.Model):
         limit_choices_to={"role": "student"},
         related_name="attendance_records",
     )
+    status = models.CharField(
+        max_length=10,
+        choices=STATUS_CHOICES,
+        default=STATUS_PRESENT,
+    )
     marked_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         unique_together = ("session", "student")
         ordering = ["-marked_at"]
 
     def __str__(self):
-        return f"{self.student.get_full_name()} present at {self.session}"
+        return f"{self.student.get_full_name()} [{self.status}] at {self.session}"
 
 
 class ThresholdAlert(models.Model):
