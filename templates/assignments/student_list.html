@@ -14,14 +14,16 @@
       <h6 style="font-size:0.9rem;">{{ item.assignment.title }}</h6>
       {% if item.submission %}
         {% if item.submission.is_late %}
-          <span class="cs-badge warning">Late</span>
+          <span class="cs-badge warning"><i class="bi bi-clock"></i> Late</span>
         {% else %}
-          <span class="cs-badge success">Submitted</span>
+          <span class="cs-badge success"><i class="bi bi-check-circle"></i> Submitted</span>
         {% endif %}
       {% elif item.is_past_due %}
-        <span class="cs-badge danger">Missing</span>
+        <span class="cs-badge danger"><i class="bi bi-x-circle"></i> Missing</span>
+      {% elif item.is_due_tomorrow %}
+        <span class="cs-badge danger"><i class="bi bi-clock-history"></i> Due Tomorrow</span>
       {% else %}
-        <span class="cs-badge neutral">Pending</span>
+        <span class="cs-badge neutral"><i class="bi bi-hourglass"></i> Pending</span>
       {% endif %}
     </div>
     <div class="cs-card-body" style="padding:0.85rem 1rem;">

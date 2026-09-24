@@ -19,7 +19,13 @@
         <div class="cs-notification-msg">{{ n.message }}</div>
         <div class="d-flex gap-3 align-items-center" style="margin-top:0.3rem;">
           <span class="cs-notification-time"><i class="bi bi-clock"></i> {{ n.sent_at|timesince }} ago</span>
-          <span class="cs-badge neutral" style="font-size:0.7rem;">{{ n.get_notif_type_display }}</span>
+          <span class="cs-badge {% if n.notif_type == 'attendance_alert' or n.notif_type == 'risk_flag' %}danger{% elif n.notif_type == 'assignment_reminder' %}warning{% elif n.notif_type == 'substitution_request' or n.notif_type == 'class_reassigned' %}info{% elif n.notif_type == 'announcement' %}primary{% else %}neutral{% endif %}" style="font-size:0.7rem;">
+            {% if n.notif_type == 'attendance_alert' %}<i class="bi bi-exclamation-triangle"></i>
+            {% elif n.notif_type == 'assignment_reminder' %}<i class="bi bi-clock-history"></i>
+            {% elif n.notif_type == 'announcement' %}<i class="bi bi-megaphone"></i>
+            {% elif n.notif_type == 'substitution_request' %}<i class="bi bi-arrow-left-right"></i>{% endif %}
+            {{ n.get_notif_type_display }}
+          </span>
           {% if not n.is_read %}
             <a href="{% url 'notifications:mark_read' n.pk %}" style="font-size:0.75rem; color:var(--cs-primary);">Mark read</a>
           {% endif %}

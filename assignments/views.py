@@ -52,7 +52,28 @@ def faculty_assignment_list(request):
     assignments = Assignment.objects.filter(
         section__in=sections
     ).select_related("section__course").order_by("due_date")
-    return render(request, "assignments/faculty_list.html", {"assignments": assignments})
+    now = timezone.now()
+    local_now = timezone.localtime(now)
+    tomorrow_date = local_now.date() + timezone.timedelta(days=1)
+
+    enriched = []
+    for a in assignments:
+        assign_local = timezone.localtime(a.due_date)
+        is_due_tomorrow = not a.is_past_due and (
+            assign_local.date() == tomorrow_date or (a.due_date > now and a.due_date <= now + timezone.timedelta(days=1, hours=2))
+        )
+        total_students = a.section.students.filter(is_active=True).count()
+        submitted_count = a.submissions.count()
+        missing_count = max(0, total_students - submitted_count)
+        enriched.append({
+            "assignment": a,
+            "is_past_due": a.is_past_due,
+            "is_due_tomorrow": is_due_tomorrow,
+            "total_students": total_students,
+            "submitted_count": submitted_count,
+            "missing_count": missing_count,
+        })
+    return render(request, "assignments/faculty_list.html", {"assignments": enriched})
 
 
 # ---------------------------------------------------------------------------
@@ -96,6 +117,8 @@ def submission_dashboard(request, assignment_id):
 def student_assignment_list(request):
     sections = request.user.enrolled_sections.all()
     now = timezone.now()
+    local_now = timezone.localtime(now)
+    tomorrow_date = local_now.date() + timezone.timedelta(days=1)
     assignments = Assignment.objects.filter(
         section__in=sections
     ).select_related("section__course").order_by("due_date")
@@ -105,11 +128,16 @@ def student_assignment_list(request):
         submission = Submission.objects.filter(
             assignment=a, student=request.user
         ).first()
+        assign_local = timezone.localtime(a.due_date)
+        is_due_tomorrow = not (now > a.due_date) and (
+            assign_local.date() == tomorrow_date or (a.due_date > now and a.due_date <= now + timezone.timedelta(days=1, hours=2))
+        )
         enriched.append({
             "assignment": a,
             "submission": submission,
             "is_past_due": now > a.due_date,
-            "can_resubmit": submission is not None and not a.is_past_due,
+            "is_due_tomorrow": is_due_tomorrow,
+            "can_resubmit": submission is not None and not (now > a.due_date),
         })
 
     return render(request, "assignments/student_list.html", {"assignments": enriched})

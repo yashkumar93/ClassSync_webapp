@@ -9,24 +9,36 @@
   <table class="cs-table">
     <thead><tr><th>Title</th><th>Course / Section</th><th>Due Date</th><th>Submissions</th><th>Actions</th></tr></thead>
     <tbody>
-    {% for a in assignments %}
+    {% for item in assignments %}
+    {% with a=item.assignment|default:item %}
     <tr>
-      <td class="fw-600">{{ a.title }}</td>
+      <td class="fw-600">
+        {{ a.title }}
+        {% if item.is_due_tomorrow %}
+          <span class="cs-badge warning ms-1" style="font-size:0.7rem;"><i class="bi bi-clock-history"></i> Due Tomorrow</span>
+        {% endif %}
+      </td>
       <td><strong>{{ a.section.course.code }}</strong>: {{ a.section.course.name }} (Sec {{ a.section.name }})</td>
       <td>
-        <span {% if a.is_past_due %}class="text-danger fw-600"{% endif %}>
-          {{ a.due_date|date:"d M Y, H:i" }}
+        <span {% if item.is_past_due|default:a.is_past_due %}class="text-danger fw-600"{% elif item.is_due_tomorrow %}class="text-warning fw-600"{% endif %}>
+          <i class="bi bi-calendar-event me-1"></i>{{ a.due_date|date:"d M Y, H:i" }}
         </span>
       </td>
       <td>
-        <span class="cs-badge info">{{ a.submissions.count }} / {{ a.section.students.count }}</span>
+        <span class="cs-badge {% if item.is_due_tomorrow and item.missing_count > 0 %}warning{% else %}info{% endif %}">
+          {{ item.submitted_count|default:a.submissions.count }} / {{ item.total_students|default:a.section.students.count }}
+        </span>
+        {% if item.missing_count > 0 %}
+          <span class="text-danger small ms-1" title="Students who haven't submitted">({{ item.missing_count }} pending)</span>
+        {% endif %}
       </td>
       <td>
         <a href="{% url 'assignments:submission_dashboard' a.pk %}" class="btn-cs-secondary" style="font-size:0.8rem;padding:0.3rem 0.7rem;">
-          <i class="bi bi-eye"></i> View
+          <i class="bi bi-eye"></i> View Submissions
         </a>
       </td>
     </tr>
+    {% endwith %}
     {% empty %}
     <tr><td colspan="5" class="text-muted text-center py-4">No assignments posted yet.</td></tr>
     {% endfor %}

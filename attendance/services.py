@@ -360,8 +360,53 @@ def notify_threshold_alert(student, course, pct):
         recipient=student,
         notif_type="attendance_alert",
         message=(
-            f"Your attendance in {course.name} has dropped to {pct:.1f}%, "
-            f"which is below the required {config.attendance_threshold}%. "
+            f"Attendance Alert: Your attendance in {course.name} ({course.code}) "
+            f"has dropped to {pct:.1f}%, which is below the required {config.attendance_threshold}%. "
             f"Please attend classes regularly to avoid academic penalties."
         ),
+        related_object_id=course.pk,
     )
+
+
+def evaluate_all_attendance_thresholds():
+    """
+    Evaluate attendance thresholds across all active students and courses.
+    Triggers in-app alerts whenever a student's attendance falls below 75%
+    (SystemConfig.attendance_threshold) in any course where classes have been held.
+
+    Returns a tuple of (triggered_count, resolved_count).
+    """
+    from core.models import User, Course
+    students = User.objects.filter(role="student", is_active=True)
+    triggered_count = 0
+    resolved_count = 0
+
+    for student in students:
+        courses = Course.objects.filter(sections__students=student).distinct()
+        for course in courses:
+            total = AttendanceSession.objects.filter(
+                timetable_slot__section__course=course,
+                timetable_slot__section__students=student,
+            ).distinct().count()
+            if total == 0:
+                continue
+
+            config = SystemConfig.get()
+            pct = attendance_percentage(student, course)
+            open_alert = ThresholdAlert.objects.filter(
+                student=student, course=course, resolved=False
+            ).first()
+
+            if pct < config.attendance_threshold:
+                if not open_alert:
+                    ThresholdAlert.objects.create(student=student, course=course)
+                    notify_threshold_alert(student, course, pct)
+                    triggered_count += 1
+            else:
+                if open_alert:
+                    open_alert.resolved = True
+                    open_alert.resolved_at = timezone.now()
+                    open_alert.save(update_fields=["resolved", "resolved_at"])
+                    resolved_count += 1
+
+    return triggered_count, resolved_count
