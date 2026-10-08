@@ -39,6 +39,11 @@
         {% endif %}
       </a>
 
+      <!-- Push Notification Quick Toggle -->
+      <button type="button" class="btn-cs-secondary cs-fcm-enable-btn" style="font-size:0.8rem; padding:0.35rem 0.75rem;" title="Push notification status">
+        <i class="bi bi-bell"></i> Enable Push
+      </button>
+
       <!-- User info -->
       <div class="nav-user">
         <i class="bi bi-person-circle" style="font-size:1.2rem; color: var(--cs-primary);"></i>
@@ -172,6 +177,20 @@
 
 <!-- Bootstrap 5 JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+{% if user.is_authenticated and FIREBASE_CONFIG.apiKey %}
+  {{ FIREBASE_CONFIG|json_script:"firebase-config" }}
+  <script>
+    window.FIREBASE_CONFIG = JSON.parse(document.getElementById("firebase-config").textContent);
+    window.FIREBASE_VAPID_KEY = "{{ FIREBASE_VAPID_KEY|default:'' }}";
+  </script>
+  <!-- Firebase App & Messaging SDKs (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js"></script>
+  <script src="{% static 'js/fcm.js' %}"></script>
+{% endif %}
+
 {% block extra_js %}{% endblock %}
 </body>
 </html>
+

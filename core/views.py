@@ -46,19 +46,87 @@ class FacultyDashboardView(TemplateView):
 
     def get_context_data(self, **kwargs):
         from absence.models import AbsenceReport
-        from attendance.models import AttendanceSession
-        from assignments.models import Assignment
+        from attendance.models import AttendanceSession, AttendanceRecord
+        from attendance.services import check_threshold
+        from assignments.models import Assignment, Submission
+        from assignments.services import send_assignment_reminders
         from notifications.models import Notification
+        from core.models import SystemConfig
+        from django.utils import timezone
 
         ctx = super().get_context_data(**kwargs)
         faculty = self.request.user
+        config = SystemConfig.get()
+        ctx["attendance_threshold"] = config.attendance_threshold
 
         # Sections this faculty teaches
         sections = faculty.teaching_sections.select_related("course").all()
         ctx["sections"] = sections
 
-        # Pending substitute confirmations for this faculty (broadcast or direct)
+        # 1. Trigger threshold evaluation and assignment reminder checks
+        for sec in sections.prefetch_related("students"):
+            for st in sec.students.filter(is_active=True):
+                check_threshold(st, sec.course)
+        send_assignment_reminders(user=faculty)
+
+        # 2. Critical Attendance Alerts (< 75%) for students in faculty's sections
+        low_attendance_list = []
+        for sec in sections:
+            total_sessions = AttendanceSession.objects.filter(
+                timetable_slot__section=sec
+            ).count()
+            if total_sessions == 0:
+                continue
+            for st in sec.students.filter(is_active=True):
+                attended = AttendanceRecord.objects.filter(
+                    session__timetable_slot__section=sec,
+                    student=st,
+                    status=AttendanceRecord.STATUS_PRESENT,
+                ).count()
+                pct = round((attended / total_sessions) * 100, 1)
+                if pct < config.attendance_threshold:
+                    low_attendance_list.append({
+                        "student": st,
+                        "section": sec,
+                        "course": sec.course,
+                        "percentage": pct,
+                        "attended": attended,
+                        "total_sessions": total_sessions,
+                    })
+
+        ctx["faculty_low_attendance_students"] = sorted(
+            low_attendance_list, key=lambda x: x["percentage"]
+        )
+
+        # 3. Missing / Unsubmitted Assignment Alerts for Faculty
         from django.db.models import Q
+        faculty_assignments = Assignment.objects.filter(
+            Q(section__in=sections) | Q(created_by=faculty)
+        ).distinct().select_related("section__course").order_by("due_date")
+
+        unsubmitted_assignments_info = []
+        for a in faculty_assignments:
+            submitted_ids = a.submissions.values_list("student_id", flat=True)
+            missing_students = a.section.students.filter(
+                is_active=True
+            ).exclude(id__in=submitted_ids).order_by("last_name", "first_name")
+            missing_count = missing_students.count()
+            total_count = a.section.students.filter(is_active=True).count()
+            if missing_count > 0:
+                unsubmitted_assignments_info.append({
+                    "assignment": a,
+                    "course": a.section.course,
+                    "section": a.section,
+                    "is_past_due": a.is_past_due,
+                    "missing_count": missing_count,
+                    "total_count": total_count,
+                    "missing_students": list(missing_students[:5]),
+                    "more_count": max(0, missing_count - 5),
+                })
+
+        ctx["faculty_unsubmitted_assignments"] = unsubmitted_assignments_info
+
+        # Pending substitute confirmations for this faculty (broadcast or direct)
         ctx["pending_confirmations"] = (
             AbsenceReport.objects.filter(
                 status=AbsenceReport.STATUS_PENDING_CONFIRMATION,
@@ -79,8 +147,7 @@ class FacultyDashboardView(TemplateView):
         ).order_by("-created_at")[:5]
 
         # Upcoming sessions (today's timetable slots + any substitute classes)
-        from django.utils import timezone
-        from absence.models import SubstitutionRecord, AbsenceReport
+        from absence.models import SubstitutionRecord
         today = timezone.localdate()
         today_weekday = today.weekday()
         ctx["today"] = today
@@ -159,18 +226,32 @@ class StudentDashboardView(TemplateView):
 
     def get_context_data(self, **kwargs):
         from attendance.analytics import get_student_attendance_summary
+        from attendance.services import check_threshold
         from assignments.models import Assignment, Submission
+        from assignments.services import send_assignment_reminders
         from notifications.models import Notification
-        from core.models import TimetableSlot
+        from core.models import TimetableSlot, SystemConfig
         from django.utils import timezone
 
         ctx = super().get_context_data(**kwargs)
         student = self.request.user
+        config = SystemConfig.get()
+        ctx["attendance_threshold"] = config.attendance_threshold
 
+        # 1. Trigger threshold evaluation and assignment reminder checks
+        for sec in student.enrolled_sections.select_related("course").all():
+            check_threshold(student, sec.course)
+        send_assignment_reminders(user=student)
+
+        # 2. Sections and Attendance Summary
         ctx["sections"] = student.enrolled_sections.select_related("course", "faculty").all()
-        ctx["attendance_summary"] = get_student_attendance_summary(student)
+        attendance_summary = get_student_attendance_summary(student)
+        ctx["attendance_summary"] = attendance_summary
 
-        # Today's classes for student
+        # Identify courses below threshold (< 75%)
+        ctx["low_attendance_alerts"] = [r for r in attendance_summary if r.get("below_threshold")]
+
+        # 3. Today's classes for student
         today = timezone.localdate()
         today_weekday = today.weekday()
         now_time = timezone.localtime(timezone.now()).time()
@@ -181,14 +262,28 @@ class StudentDashboardView(TemplateView):
             day=today_weekday,
         ).select_related("section__course", "section__faculty").order_by("period_number")
 
-        # Upcoming assignment deadlines
+        # 4. Unsubmitted / Missing Assignment Alerts
         now = timezone.now()
+        submitted_assignment_ids = Submission.objects.filter(
+            student=student
+        ).values_list("assignment_id", flat=True)
+
+        unsubmitted_assignments = Assignment.objects.filter(
+            section__students=student
+        ).exclude(
+            id__in=submitted_assignment_ids
+        ).select_related("section__course", "section__faculty").order_by("due_date")
+
+        ctx["missing_assignment_alerts"] = list(unsubmitted_assignments)
+        ctx["overdue_assignments"] = [a for a in unsubmitted_assignments if a.is_past_due]
+
+        # Upcoming assignment deadlines (unsubmitted + future due date)
         ctx["upcoming_assignments"] = (
             Assignment.objects.filter(
                 section__in=student.enrolled_sections.all(),
                 due_date__gte=now,
             )
-            .exclude(submissions__student=student)
+            .exclude(id__in=submitted_assignment_ids)
             .order_by("due_date")[:5]
         )
 

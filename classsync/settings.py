@@ -11,7 +11,8 @@ environ.Env.read_env(BASE_DIR / ".env")
 
 SECRET_KEY = env("SECRET_KEY", default="django-insecure-dev-key-change-in-prod")
 DEBUG = env("DEBUG")
-ALLOWED_HOSTS = ["127.0.0.1", "localhost", "10.0.2.2"]
+ALLOWED_HOSTS = ["127.0.0.1", "localhost", "10.0.2.2", "testserver"]
+
 INSTALLED_APPS = [
     # Django built-ins
     "django.contrib.admin",
@@ -56,6 +57,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "notifications.context_processors.unread_notifications",
+                "notifications.context_processors.firebase_config",
             ],
         },
     },
@@ -116,3 +118,17 @@ CLASSSYNC_ATTENDANCE_THRESHOLD = 75
 CLASSSYNC_RISK_MISSED_SUBMISSIONS = 2
 CLASSSYNC_RISK_WINDOW_DAYS = 30
 CLASSSYNC_CONFIRMATION_WINDOW_MINUTES = 12
+
+# Firebase Cloud Messaging & Web Push Configuration
+FIREBASE_CREDENTIALS_PATH = env("FIREBASE_CREDENTIALS_PATH", default="")
+FIREBASE_CONFIG = {
+    "apiKey": env("FIREBASE_API_KEY", default=""),
+    "authDomain": env("FIREBASE_AUTH_DOMAIN", default=""),
+    "projectId": env("FIREBASE_PROJECT_ID", default=""),
+    "storageBucket": env("FIREBASE_STORAGE_BUCKET", default=""),
+    "messagingSenderId": env("FIREBASE_MESSAGING_SENDER_ID", default=""),
+    "appId": env("FIREBASE_APP_ID", default=""),
+    "measurementId": env("FIREBASE_MEASUREMENT_ID", default=""),
+}
+FIREBASE_VAPID_KEY = env("FIREBASE_VAPID_KEY", default="")
+

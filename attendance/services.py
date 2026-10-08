@@ -329,8 +329,8 @@ def check_threshold(student, course):
     """
     Check if the student's attendance in a course has crossed the threshold.
 
-    - Below threshold + no open alert → create alert + notify.
-    - Below threshold + open alert exists → do nothing (no spam).
+    - Below threshold + no open alert → create alert + notify both student and faculty.
+    - Below threshold + open alert exists → ensure faculty has received notification once.
     - At/above threshold + open alert → resolve the alert.
     """
     config = SystemConfig.get()
@@ -343,6 +343,9 @@ def check_threshold(student, course):
         if not open_alert:
             ThresholdAlert.objects.create(student=student, course=course)
             notify_threshold_alert(student, course, pct)
+        else:
+            # Ensure faculty has received alert for open alert (deduplicated)
+            _ensure_faculty_threshold_alert(student, course, pct)
     else:
         if open_alert:
             open_alert.resolved = True
@@ -351,11 +354,16 @@ def check_threshold(student, course):
 
 
 def notify_threshold_alert(student, course, pct):
-    """Drop a Notification row for the student (TYPE_ATTENDANCE_ALERT)."""
+    """
+    Drop Notification rows for the student AND the faculty teaching this student's
+    section in this course (TYPE_ATTENDANCE_ALERT).
+    """
     from notifications.utils import create_notification
     from core.models import SystemConfig
 
     config = SystemConfig.get()
+
+    # 1. Alert to Student
     create_notification(
         recipient=student,
         notif_type="attendance_alert",
@@ -366,6 +374,58 @@ def notify_threshold_alert(student, course, pct):
         ),
         related_object_id=course.pk,
     )
+
+    # 2. Alert to Faculty teaching this student's section(s) in this course
+    _notify_faculty_attendance_breach(student, course, pct, config.attendance_threshold)
+
+
+def _notify_faculty_attendance_breach(student, course, pct, threshold):
+    """Send attendance alert to the faculty teaching this student in the course."""
+    from notifications.utils import create_notification
+
+    sections = course.sections.filter(students=student).select_related("faculty")
+    roll_str = f" ({student.roll_number})" if getattr(student, "roll_number", None) else ""
+    notified_faculty_ids = set()
+
+    for sec in sections:
+        fac = sec.faculty
+        if fac and fac.pk not in notified_faculty_ids:
+            create_notification(
+                recipient=fac,
+                notif_type="attendance_alert",
+                message=(
+                    f"Low Attendance Alert: Student {student.get_full_name()}{roll_str} "
+                    f"has {pct:.1f}% attendance in {course.name} ({course.code}, Section {sec.name}), "
+                    f"which is below the required {threshold}% threshold."
+                ),
+                related_object_id=course.pk,
+            )
+            notified_faculty_ids.add(fac.pk)
+
+
+def _ensure_faculty_threshold_alert(student, course, pct):
+    """Ensure faculty has received at least one alert for this student's ongoing breach."""
+    from notifications.models import Notification
+    from core.models import SystemConfig
+
+    config = SystemConfig.get()
+    sections = course.sections.filter(students=student).select_related("faculty")
+    for sec in sections:
+        fac = sec.faculty
+        if fac:
+            already_notified = Notification.objects.filter(
+                recipient=fac,
+                notif_type=Notification.TYPE_ATTENDANCE_ALERT,
+                related_object_id=course.pk,
+                message__icontains=student.username,
+            ).exists() or Notification.objects.filter(
+                recipient=fac,
+                notif_type=Notification.TYPE_ATTENDANCE_ALERT,
+                related_object_id=course.pk,
+                message__icontains=student.get_full_name(),
+            ).exists()
+            if not already_notified:
+                _notify_faculty_attendance_breach(student, course, pct, config.attendance_threshold)
 
 
 def evaluate_all_attendance_thresholds():

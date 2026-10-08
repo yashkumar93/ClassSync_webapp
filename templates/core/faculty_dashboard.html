@@ -33,6 +33,164 @@
 </div>
 {% endfor %}
 
+<!-- ======================================================================= -->
+<!-- Critical Attendance Alerts for Faculty (< 75%) -->
+<!-- ======================================================================= -->
+{% if faculty_low_attendance_students %}
+<div class="cs-card mb-3" style="border: 1px solid rgba(239, 68, 68, 0.35); border-left: 6px solid #dc3545; background: linear-gradient(135deg, rgba(254, 242, 242, 0.85) 0%, #ffffff 100%); box-shadow: 0 4px 14px rgba(220, 53, 69, 0.08);">
+  <div class="cs-card-body p-3">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+      <div class="d-flex align-items-center gap-2">
+        <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(220, 53, 69, 0.12); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <i class="bi bi-people-fill text-danger" style="font-size: 1.3rem;"></i>
+        </div>
+        <div>
+          <div class="fw-bold text-danger d-flex align-items-center gap-2" style="font-size: 1.05rem;">
+            <span>Critical Attendance Alert &mdash; {{ faculty_low_attendance_students|length }} Student{{ faculty_low_attendance_students|length|pluralize }} Below {{ attendance_threshold }}% Threshold</span>
+            <span class="cs-badge danger" style="font-size: 0.7rem; padding: 0.2rem 0.5rem;"><i class="bi bi-exclamation-triangle"></i> Action Required</span>
+          </div>
+          <div class="text-muted small">
+            Students enrolled in your sections who are currently breaching the mandatory {{ attendance_threshold }}% attendance requirement.
+          </div>
+        </div>
+      </div>
+      <a href="{% url 'notifications:risk_flags' %}" class="btn btn-sm btn-outline-danger fw-600">
+        <i class="bi bi-flag"></i> View Early-Warning Risk Flags
+      </a>
+    </div>
+
+    <div class="cs-table-wrapper" style="border: 1px solid rgba(220, 53, 69, 0.2); box-shadow: none; border-radius: 8px; background: white;">
+      <table class="cs-table">
+        <thead>
+          <tr>
+            <th>Student</th>
+            <th>Roll Number</th>
+            <th>Course & Section</th>
+            <th>Attendance %</th>
+            <th>Sessions</th>
+            <th style="text-align:right;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in faculty_low_attendance_students %}
+          <tr>
+            <td>
+              <div class="fw-600">{{ item.student.get_full_name }}</div>
+              <div class="text-muted small">{{ item.student.email }}</div>
+            </td>
+            <td><span class="cs-badge neutral fw-600">{{ item.student.roll_number|default:item.student.username }}</span></td>
+            <td>
+              <strong>{{ item.course.code }}</strong>: {{ item.course.name }}
+              <span class="text-muted small ms-1">(Sec {{ item.section.name }})</span>
+            </td>
+            <td>
+              <span class="cs-badge danger fw-bold" style="font-size: 0.8rem;">
+                <i class="bi bi-exclamation-triangle"></i> {{ item.percentage }}%
+              </span>
+            </td>
+            <td><span class="small">{{ item.attended }} / {{ item.total_sessions }}</span></td>
+            <td style="text-align:right;">
+              <a href="{% url 'attendance:section_dashboard' item.section.pk %}" class="btn-cs-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.65rem;">
+                <i class="bi bi-bar-chart"></i> View Section
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- ======================================================================= -->
+<!-- Missing & Unsubmitted Assignment Alerts for Faculty -->
+<!-- ======================================================================= -->
+{% if faculty_unsubmitted_assignments %}
+<div class="cs-card mb-3" style="border: 1px solid rgba(245, 158, 11, 0.4); border-left: 6px solid #f59e0b; background: linear-gradient(135deg, rgba(254, 243, 199, 0.55) 0%, #ffffff 100%); box-shadow: 0 4px 14px rgba(245, 158, 11, 0.08);">
+  <div class="cs-card-body p-3">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+      <div class="d-flex align-items-center gap-2">
+        <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(245, 158, 11, 0.15); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <i class="bi bi-clipboard-x-fill text-warning" style="font-size: 1.3rem;"></i>
+        </div>
+        <div>
+          <div class="fw-bold text-dark d-flex align-items-center gap-2" style="font-size: 1.05rem;">
+            <span>Unsubmitted Assignment Alerts &mdash; {{ faculty_unsubmitted_assignments|length }} Assignment{{ faculty_unsubmitted_assignments|length|pluralize }} with Pending Submissions</span>
+            <span class="cs-badge warning" style="font-size: 0.7rem; padding: 0.2rem 0.5rem;"><i class="bi bi-clock-history"></i> Follow-up Needed</span>
+          </div>
+          <div class="text-muted small">
+            Students have not yet submitted required assignments. Review unsubmitted student lists and dispatch notices.
+          </div>
+        </div>
+      </div>
+      <a href="{% url 'assignments:faculty_list' %}" class="btn btn-sm btn-outline-warning text-dark fw-600">
+        <i class="bi bi-file-earmark-text"></i> All Faculty Assignments
+      </a>
+    </div>
+
+    <div class="cs-table-wrapper" style="border: 1px solid rgba(245, 158, 11, 0.25); box-shadow: none; border-radius: 8px; background: white;">
+      <table class="cs-table">
+        <thead>
+          <tr>
+            <th>Assignment Title</th>
+            <th>Course & Section</th>
+            <th>Deadline</th>
+            <th>Pending Submissions</th>
+            <th>Students Missing Submission</th>
+            <th style="text-align:right;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in faculty_unsubmitted_assignments %}
+          <tr>
+            <td>
+              <div class="fw-600" style="font-size: 0.88rem;">{{ item.assignment.title }}</div>
+            </td>
+            <td>
+              <strong>{{ item.course.code }}</strong>: {{ item.course.name }}
+              <span class="text-muted small ms-1">(Sec {{ item.section.name }})</span>
+            </td>
+            <td>
+              {% if item.is_past_due %}
+                <span class="cs-badge danger" style="font-size: 0.7rem; padding: 0.15rem 0.45rem;">
+                  <i class="bi bi-exclamation-circle"></i> Overdue ({{ item.assignment.due_date|date:"d M, H:i" }})
+                </span>
+              {% else %}
+                <span class="cs-badge warning" style="font-size: 0.7rem; padding: 0.15rem 0.45rem;">
+                  <i class="bi bi-clock"></i> Due {{ item.assignment.due_date|date:"d M, H:i" }}
+                </span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="cs-badge {% if item.is_past_due %}danger{% else %}warning{% endif %} fw-bold" style="font-size: 0.78rem;">
+                {{ item.missing_count }} of {{ item.total_count }} pending
+              </span>
+            </td>
+            <td>
+              <span class="small text-muted">
+                {% for st in item.missing_students %}
+                  {{ st.get_full_name }}{% if not forloop.last %}, {% endif %}
+                {% endfor %}
+                {% if item.more_count > 0 %}
+                  <em>(+{{ item.more_count }} more)</em>
+                {% endif %}
+              </span>
+            </td>
+            <td style="text-align:right;">
+              <a href="{% url 'assignments:submission_dashboard' item.assignment.pk %}" class="btn-cs-primary" style="font-size: 0.75rem; padding: 0.25rem 0.65rem;">
+                <i class="bi bi-list-check"></i> Submissions
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <div class="row g-3">
   <!-- Today's classes -->
   <div class="col-lg-7">

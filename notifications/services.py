@@ -7,8 +7,11 @@ is wired in exactly once. Every prior Phase 1-3 caller imports from
 notifications.utils, which re-exports from here.
 """
 import logging
+import os
 from datetime import timedelta
+from pathlib import Path
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
@@ -16,6 +19,60 @@ from core.models import User, SystemConfig
 from .models import Notification, DeviceToken, Announcement, RiskFlag
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Firebase Initialization
+# ---------------------------------------------------------------------------
+
+def initialize_firebase():
+    """
+    Initialize Firebase Admin SDK using credentials from settings.FIREBASE_CREDENTIALS_PATH
+    or default credentials. Safe to call multiple times.
+    """
+    try:
+        import firebase_admin
+        from firebase_admin import credentials
+
+        if firebase_admin._apps:
+            return firebase_admin.get_app()
+
+        cred_path = (
+            getattr(settings, "FIREBASE_CREDENTIALS_PATH", None)
+            or os.environ.get("FIREBASE_CREDENTIALS")
+            or os.environ.get("FIREBASE_CREDENTIALS_PATH")
+        )
+        if cred_path:
+            full_path = Path(settings.BASE_DIR) / cred_path if not os.path.isabs(cred_path) else Path(cred_path)
+            if full_path.exists():
+                cred = credentials.Certificate(str(full_path))
+                app = firebase_admin.initialize_app(cred)
+                logger.info("Firebase Admin SDK initialized with certificate: %s", full_path.name)
+                return app
+            else:
+                logger.warning("Firebase credentials file not found at: %s", full_path)
+
+        # Fallback to default firebase-credentials.json in base directory
+        default_file = Path(settings.BASE_DIR) / "firebase-credentials.json"
+        if default_file.exists():
+            cred = credentials.Certificate(str(default_file))
+            app = firebase_admin.initialize_app(cred)
+            logger.info("Firebase Admin SDK initialized with default certificate: %s", default_file.name)
+            return app
+
+        if os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
+            app = firebase_admin.initialize_app()
+            logger.info("Firebase Admin SDK initialized with GOOGLE_APPLICATION_CREDENTIALS.")
+            return app
+
+        logger.info("Firebase credentials not configured — push delivery skipped.")
+        return None
+    except ImportError:
+        logger.debug("firebase-admin library not installed.")
+        return None
+    except Exception as e:
+        logger.error("Failed to initialize Firebase Admin SDK: %s", e)
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -35,7 +92,17 @@ def create_notification(recipient, notif_type, message, related_object_id=None):
     )
 
     try:
-        send_push(recipient, message)
+        notif_title = f"Class Sync — {notification.get_notif_type_display()}"
+        send_push(
+            recipient,
+            message,
+            title=notif_title,
+            data={
+                "type": notif_type,
+                "notification_id": str(notification.pk),
+                "related_object_id": str(related_object_id or ""),
+            }
+        )
     except Exception:
         logger.warning(
             "Push delivery failed for user %s (notification pk=%s) — "
@@ -48,19 +115,16 @@ def create_notification(recipient, notif_type, message, related_object_id=None):
 
 
 # ---------------------------------------------------------------------------
-# FCM Push Delivery (pluggable stub)
+# FCM Push Delivery
 # ---------------------------------------------------------------------------
 
-def send_push(user, message):
+def send_push(user, message, title="Class Sync", data=None):
     """
     Attempt to send a push notification via FCM to all of the user's
-    registered device tokens.
-
-    This is a pluggable stub: it logs the push attempt and is ready to
-    wire to firebase-admin when credentials are configured. If
-    firebase-admin is not installed, it degrades gracefully to a log line.
+    registered device tokens. Stale or unregistered tokens are automatically
+    cleaned up from the database.
     """
-    tokens = DeviceToken.objects.filter(user=user).values_list("token", flat=True)
+    tokens = list(DeviceToken.objects.filter(user=user))
     if not tokens:
         return
 
@@ -68,30 +132,50 @@ def send_push(user, message):
         import firebase_admin
         from firebase_admin import messaging
 
-        # Ensure default app is initialised
-        if not firebase_admin._apps:
-            logger.info("Firebase not initialised — skipping push delivery.")
+        app = initialize_firebase()
+        if not app:
+            logger.debug("Firebase not initialized — skipping push delivery for user %s", user.username)
             return
 
-        for token in tokens:
+        payload_data = {
+            "title": str(title),
+            "body": str(message)[:500],
+            "message": str(message)[:500],
+            "click_action": "/notifications/",
+        }
+        if data:
+            for k, v in data.items():
+                payload_data[str(k)] = str(v)
+
+        for device_token in tokens:
             try:
                 msg = messaging.Message(
                     notification=messaging.Notification(
-                        title="Class Sync",
-                        body=message[:200],
+                        title=str(title),
+                        body=str(message)[:200],
                     ),
-                    token=token,
+                    data=payload_data,
+                    token=device_token.token,
                 )
                 messaging.send(msg)
-                logger.debug("Push sent to token %s…", token[:12])
+                logger.debug("Push sent successfully to %s (%s…)", user.username, device_token.token[:12])
+            except messaging.UnregisteredError:
+                logger.info("FCM token expired/unregistered for %s (%s…) — removing.", user.username, device_token.token[:12])
+                device_token.delete()
             except Exception as e:
-                logger.warning("Push failed for token %s…: %s", token[:12], e)
+                err_msg = str(e).lower()
+                if "invalid registration token" in err_msg or "registration-token-not-registered" in err_msg:
+                    logger.info("Invalid FCM token for %s (%s…) — removing.", user.username, device_token.token[:12])
+                    device_token.delete()
+                else:
+                    logger.warning("Push failed for token %s…: %s", device_token.token[:12], e)
 
     except ImportError:
         logger.debug(
             "firebase-admin not installed — push skipped for user %s (%d tokens).",
             user.pk, len(tokens),
         )
+
 
 
 # ---------------------------------------------------------------------------
